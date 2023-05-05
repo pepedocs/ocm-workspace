@@ -7,6 +7,12 @@ import (
 	gocmd "github.com/go-cmd/cmd"
 )
 
+func runCommandListStreamOutput(commandList [][]string) {
+	for _, command := range commandList {
+		runCommandStreamOutput(command[0], command[1:]...)
+	}
+}
+
 // Runs a blocking command (go-cmd) and streams its output.
 // https://github.com/go-cmd/cmd/blob/master/examples/blocking-streaming/main.go
 func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {

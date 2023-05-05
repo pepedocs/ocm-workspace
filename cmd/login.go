@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
+Copyright © 2023 Jose Cueto <pepedocs@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,27 +34,16 @@ var (
 // loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Runs the ocm workspace container and logs in to a cluster.",
+	Long: `Runs the ocm workspace container with the ocm workspace as its entrypoint.
+           The entrypoint is supplied with the "clusterLogin" flag to proceed with
+		   logging into a cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ocmCluster := args[0]
 		ocmEnvironment := "production"
 		if len(args) > 1 {
 			ocmEnvironment = args[1]
 		}
-
-		signalChan := make(chan os.Signal)
-		signal.Notify(signalChan, os.Interrupt, syscall.SIGINT)
-		go func() {
-			<-signalChan
-			os.Exit(1)
-		}()
-
 		runOCMWorkspaceContainer(ocmCluster, ocmEnvironment)
 	},
 	Args: cobra.MaximumNArgs(2),
