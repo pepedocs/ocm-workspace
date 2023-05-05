@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
+Copyright © 2023 Jose Cueto <pepedocs@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,37 +16,39 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-// buildCmd represents the build command
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Builds the OCM workspace image locally.",
+	Long:  `Builds the OCM workspace image locally and tags it with ocm-workspace:latest:`,
 	Run: func(cmd *cobra.Command, args []string) {
-		runCommandStreamOutput("go", "install", "-o", "workspace")
-		// Build ocm-workspace image
-		runCommandStreamOutput("podman", "build", "-t", "ocm-workspace", ".")
+		buildArgBaseImage := fmt.Sprintf("BASE_IMAGE=%s", viper.GetString("baseImage"))
+		buildArgOcmCLIVersion := fmt.Sprintf("OCM_CLI_VERSION=%s", viper.GetString("ocmCLIVersion"))
+		buildArgRhocCLIVersion := fmt.Sprintf("RHOC_CLI_VERSION=%s", viper.GetString("rhocCLIVersion"))
+		buildArgBackplaneCLIVersion := fmt.Sprintf("BACKPLANE_CLI_VERSION=%s", viper.GetString("backplaneCLIVersion"))
 
+		runCommandStreamOutput(
+			"podman",
+			"build", "-t",
+			"ocm-workspace",
+			"--build-arg",
+			buildArgBaseImage,
+			"--build-arg",
+			buildArgOcmCLIVersion,
+			"--build-arg",
+			buildArgRhocCLIVersion,
+			"--build-arg",
+			buildArgBackplaneCLIVersion,
+			".",
+		)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// buildCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// buildCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
