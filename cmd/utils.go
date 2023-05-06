@@ -1,11 +1,26 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 
 	gocmd "github.com/go-cmd/cmd"
 )
+
+type ocContext struct {
+	Name    string            `json:"name"`
+	Context map[string]string `json:"context"`
+}
+
+type ocConfig struct {
+	Contexts       []ocContext `json:"contexts"`
+	CurrentContext string      `json:"current-context"`
+}
+
+var unknownNamespace = "unknownNamespace"
 
 func runCommandListStreamOutput(commandList [][]string) {
 	for _, command := range commandList {
@@ -51,4 +66,24 @@ func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
 	// Wait for goroutine to print everything
 	<-doneChan
 	return command.Status()
+}
+
+func ocGetCurrentNamespace(runAsOcUser string) string {
+	bytes, err := exec.Command("sudo", "-Eu", runAsOcUser, "oc", "config", "view", "-o", "json").Output()
+	if err != nil {
+		log.Println(err)
+		return unknownNamespace
+	}
+	var config ocConfig
+	json.Unmarshal(bytes, &config)
+
+	currentContext := config.CurrentContext
+
+	for _, context := range config.Contexts {
+		if context.Name == currentContext {
+			return context.Context["namespace"]
+		}
+	}
+
+	return unknownNamespace
 }
