@@ -17,9 +17,12 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -53,6 +56,12 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
 	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocmUser"))
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", viper.GetString("ocmToken"))
 	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
+	numFreePortsToGenerate := viper.GetInt("numHostPortMaps")
+
+	freeHostPorts, err := getFreePorts(numFreePortsToGenerate)
+	if err != nil {
+		log.Fatal("Failed to get free host ports: ", err)
+	}
 
 	userHome := fmt.Sprintf("/home/%s", viper.GetString("ocmUser"))
 
@@ -66,9 +75,13 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
 
 	envVarOcmEnvironment := fmt.Sprintf("OCM_ENVIRONMENT=%s", ocmEnvironment)
 	envVarBackplaneConfig := fmt.Sprintf("BACKPLANE_CONFIG=%s", containerBackplaneConfigPath)
-	cmd := exec.Command(
-		"podman",
+
+	suffix := uuid.New()
+	containerName := fmt.Sprintf("ow-%s-%s", ocmCluster, suffix.String()[:6])
+	commandArgs := []string{
 		"run",
+		"--name",
+		containerName,
 		"-it",
 		"--privileged",
 		"-e",
@@ -85,12 +98,23 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
 		volMapBackplaneConfig,
 		"-v",
 		volMapTerminalDir,
+	}
+
+	for _, port := range freeHostPorts {
+		portMap := fmt.Sprintf("%s:%s", strconv.Itoa(port), strconv.Itoa(port))
+		commandArgs = append(commandArgs, "-p")
+		commandArgs = append(commandArgs, portMap)
+	}
+
+	commandArgs = append(
+		commandArgs,
 		"--entrypoint",
 		"./workspace",
 		"ocm-workspace:latest",
 		"clusterLogin",
 		ocmCluster,
 	)
+	cmd := exec.Command("podman", commandArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
