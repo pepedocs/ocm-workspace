@@ -35,3 +35,4 @@ RUN dnf update -y && \
 RUN mkdir /ocm-workspace
 WORKDIR /ocm-workspace
 ADD ./workspace .
+RUN chmod +x ./workspace && cp ./workspace /usr/bin/workspace

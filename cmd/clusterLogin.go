@@ -25,6 +25,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	clusterLoginCmdArgs struct {
+		cluster string
+	}
+)
+
 var clusterLoginCmd = &cobra.Command{
 	Use:   "clusterLogin",
 	Short: "Logs in to an OpenShift Dedicated cluster.",
@@ -40,13 +46,33 @@ var clusterLoginCmd = &cobra.Command{
 
 func initTerminal() {
 	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	userHome := fmt.Sprintf("/home/%s", ocmUser)
+	cluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
+	userBashrcPath := fmt.Sprintf("%s/.bashrc", userHome)
+	runCommandStreamOutput("cp", "/terminal/bashrc", userBashrcPath)
+
+	file, err := os.OpenFile(userBashrcPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("Failed to open %s: %s\n", userBashrcPath, err)
+	} else {
+		defer file.Close()
+
+		ps1String := fmt.Sprintf(
+			"\nPS1='[%s@%s $(/usr/bin/workspace currentNamespace %s)]$ '\n",
+			ocmUser, cluster, ocmUser,
+		)
+		_, err = file.WriteString(ps1String)
+		if err != nil {
+			log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
+		}
+
+	}
 	cmd := exec.Command(
 		"sudo",
 		"-Eu",
 		ocmUser,
 		"bash",
 	)
-
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -163,7 +189,7 @@ func init() {
 
 	flags := clusterLoginCmd.Flags()
 	flags.StringVar(
-		&args.cluster,
+		&clusterLoginCmdArgs.cluster,
 		"cluster",
 		"",
 		"Cluster name or id.",

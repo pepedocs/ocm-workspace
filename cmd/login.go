@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	args struct {
+	loginCmdArgs struct {
 		cluster        string
 		ocmEnvironment string
 	}
@@ -62,6 +62,7 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
 	if ocmEnvironment == "staging" {
 		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/config.stage.json:/backplane-config:ro", userHome)
 	}
+	volMapTerminalDir := "./terminal:/terminal:ro"
 
 	envVarOcmEnvironment := fmt.Sprintf("OCM_ENVIRONMENT=%s", ocmEnvironment)
 	envVarBackplaneConfig := fmt.Sprintf("BACKPLANE_CONFIG=%s", containerBackplaneConfigPath)
@@ -82,6 +83,8 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
 		envVarBackplaneConfig,
 		"-v",
 		volMapBackplaneConfig,
+		"-v",
+		volMapTerminalDir,
 		"--entrypoint",
 		"./workspace",
 		"ocm-workspace:latest",
@@ -99,7 +102,7 @@ func init() {
 
 	flags := loginCmd.Flags()
 	flags.StringVarP(
-		&args.cluster,
+		&loginCmdArgs.cluster,
 		"ocmCluster",
 		"c",
 		"",
@@ -107,7 +110,7 @@ func init() {
 	)
 
 	flags.StringVarP(
-		&args.ocmEnvironment,
+		&loginCmdArgs.ocmEnvironment,
 		"ocmEnvironment",
 		"e",
 		"production",

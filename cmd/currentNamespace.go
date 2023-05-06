@@ -13,10 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package main
+package cmd
 
-import "ocm-workspace/cmd"
+import (
+	"fmt"
 
-func main() {
-	cmd.Execute()
+	"github.com/spf13/cobra"
+)
+
+var currentNamespaceCmd = &cobra.Command{
+	Use:   "currentNamespace",
+	Short: "Shows OpenShift's current context namespace given an OpenShift user.",
+	Run: func(cmd *cobra.Command, args []string) {
+		ocUser := args[0]
+		namespace := ocGetCurrentNamespace(ocUser)
+		fmt.Print(namespace)
+	},
+	Args: cobra.ExactArgs(1),
+}
+
+func init() {
+	rootCmd.AddCommand(currentNamespaceCmd)
 }
