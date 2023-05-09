@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Jose Cueto <pepedocs@gmail.com>
+Copyright © 2023 Jose Cueto
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,16 +25,56 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
+
+// Represents a port bind between a k8s service, a container (forwarded port) and a container's host
+type serviceHostPortBind struct {
+	HostPort      int    `yaml:"hostPort"`
+	ServicePort   int    `yaml:"servicePort"`
+	ServiceName   string `yaml:"serviceName"`
+	ParentService string `yaml:"parentService"`
+	SourceKind    string `yaml:"sourceKind"`
+	SourceName    string `yaml:"sourceName"`
+	Namespace     string `yaml:"namespace"`
+}
+
+type serviceHostPortBindList struct {
+	ServiceHostPortBinds []serviceHostPortBind `yaml:"serviceHostPortBinds"`
+}
+
+// Represents a k8s service's port forward source (e.g. pod or deployment)
+type serviceRefForwardPortSource struct {
+	Kind string `mapstructure:"kind"`
+	Name string `mapstructure:"name"`
+}
+
+// Represents a k8s service port forward parameters
+type serviceRefForwardPort struct {
+	Name      string                      `mapstructure:"name"`
+	Namespace string                      `mapstructure:"namespace"`
+	Source    serviceRefForwardPortSource `mapstructure:"source"`
+	Port      int                         `mapstructure:"port"`
+}
+
+// Represents a parent service's list of child services that need port forwards
+type serviceRefConfig struct {
+	Name         string                  `mapstructure:"name"`
+	ForwardPorts []serviceRefForwardPort `mapstructure:"forwardPorts"`
+}
+
+type ocmWorkspaceConfig struct {
+	Services []serviceRefConfig `mapstructure:"services"`
+}
 
 var (
 	loginCmdArgs struct {
 		cluster        string
 		ocmEnvironment string
+		service        string
 	}
 )
 
-// loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Runs the ocm workspace container and logs in to a cluster.",
@@ -42,40 +82,35 @@ var loginCmd = &cobra.Command{
            The entrypoint is supplied with the "clusterLogin" flag to proceed with
 		   logging into a cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		ocmCluster := args[0]
 		ocmEnvironment := "production"
-		if len(args) > 1 {
-			ocmEnvironment = args[1]
+		serviceRef := loginCmdArgs.service
+		if len(loginCmdArgs.ocmEnvironment) > 0 {
+			ocmEnvironment = loginCmdArgs.ocmEnvironment
 		}
-		runOCMWorkspaceContainer(ocmCluster, ocmEnvironment)
+		runOCMWorkspaceContainer(loginCmdArgs.cluster, ocmEnvironment, serviceRef)
 	},
-	Args: cobra.MaximumNArgs(2),
 }
 
-func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
+// Runs the OCM Workspace container using the image built by the "build" command
+func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string, serviceRef string) {
 	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocmUser"))
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", viper.GetString("ocmToken"))
 	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
-	numFreePortsToGenerate := viper.GetInt("numHostPortMaps")
-
-	freeHostPorts, err := getFreePorts(numFreePortsToGenerate)
-	if err != nil {
-		log.Fatal("Failed to get free host ports: ", err)
-	}
-
 	userHome := fmt.Sprintf("/home/%s", viper.GetString("ocmUser"))
 
-	containerBackplaneConfigPath := "/backplane-config"
+	// Paths to where these files are mounted in the workspace container
+	containerBackplaneConfigPath := "/backplane-config.json"
+	ocmWorkspaceConfigPath := "/.ocm-workspace.yaml"
 
 	volMapBackplaneConfig := fmt.Sprintf("%s/.config/backplane/config.prod.json:%s:ro", userHome, containerBackplaneConfigPath)
 	if ocmEnvironment == "staging" {
-		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/config.stage.json:/backplane-config:ro", userHome)
+		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/config.stage.json:%s:ro", userHome, containerBackplaneConfigPath)
 	}
-	volMapTerminalDir := "./terminal:/terminal:ro"
 
+	volMapTerminalDir := "./terminal:/terminal:ro"
+	volMapOcmWorkspaceConfig := fmt.Sprintf("%s/.ocm-workspace.yaml:%s:ro", userHome, ocmWorkspaceConfigPath)
 	envVarOcmEnvironment := fmt.Sprintf("OCM_ENVIRONMENT=%s", ocmEnvironment)
 	envVarBackplaneConfig := fmt.Sprintf("BACKPLANE_CONFIG=%s", containerBackplaneConfigPath)
-
 	suffix := uuid.New()
 	containerName := fmt.Sprintf("ow-%s-%s", ocmCluster, suffix.String()[:6])
 	commandArgs := []string{
@@ -98,21 +133,62 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string) {
 		volMapBackplaneConfig,
 		"-v",
 		volMapTerminalDir,
+		"-v",
+		volMapOcmWorkspaceConfig,
 	}
 
-	for _, port := range freeHostPorts {
-		portMap := fmt.Sprintf("%s:%s", strconv.Itoa(port), strconv.Itoa(port))
-		commandArgs = append(commandArgs, "-p")
-		commandArgs = append(commandArgs, portMap)
+	var config ocmWorkspaceConfig
+	err := viper.Unmarshal(&config)
+	if err != nil {
+		log.Fatal("Failed to unmarshal config: ", err)
 	}
 
+	var portBindList serviceHostPortBindList
+
+	// Bind service ports to free host ports
+	for _, svcRefConf := range config.Services {
+		for _, forwardPort := range svcRefConf.ForwardPorts {
+			ports, err := getFreePorts(1)
+			if err != nil {
+				log.Fatalf("Failed to generate port for %s: %s", svcRefConf.Name, err)
+			}
+			// Host port must only be locally accessible
+			portMap := fmt.Sprintf("127.0.0.1:%s:%s", strconv.Itoa(ports[0]), strconv.Itoa(ports[0]))
+			commandArgs = append(commandArgs, "-p")
+			commandArgs = append(commandArgs, portMap)
+
+			var svcHostPort serviceHostPortBind
+			svcHostPort.HostPort = ports[0]
+			svcHostPort.ServiceName = forwardPort.Name
+			svcHostPort.ServicePort = forwardPort.Port
+			svcHostPort.ParentService = svcRefConf.Name
+			svcHostPort.SourceKind = forwardPort.Source.Kind
+			svcHostPort.SourceName = forwardPort.Source.Name
+			svcHostPort.Namespace = forwardPort.Namespace
+			portBindList.ServiceHostPortBinds = append(
+				portBindList.ServiceHostPortBinds,
+				svcHostPort,
+			)
+		}
+	}
+
+	// Store the service and host port binds into an environment variable
+	portBindListYamlStr, err := yaml.Marshal(portBindList)
+	if err != nil {
+		log.Printf("Failed to marshal port bind list string %s: %s", portBindListYamlStr, err)
+	}
+	envVarPortBindListYamlStr := fmt.Sprintf("HOST_PORT_MAPS=\"%s\"", portBindListYamlStr)
 	commandArgs = append(
 		commandArgs,
+		"-e",
+		envVarPortBindListYamlStr,
 		"--entrypoint",
 		"./workspace",
 		"ocm-workspace:latest",
 		"clusterLogin",
 		ocmCluster,
+		"--config",
+		ocmWorkspaceConfigPath,
 	)
 	cmd := exec.Command("podman", commandArgs...)
 	cmd.Stdout = os.Stdout
@@ -140,4 +216,15 @@ func init() {
 		"production",
 		"OCM environemnt (production, staging)",
 	)
+
+	flags.StringVarP(
+		&loginCmdArgs.service,
+		"service",
+		"s",
+		"",
+		"OpenShift service reference.",
+	)
+
+	loginCmd.MarkFlagRequired("ocmCluster")
+
 }

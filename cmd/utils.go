@@ -1,9 +1,24 @@
+/*
+Copyright © 2023 Jose Cueto
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cmd
 
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -20,8 +35,6 @@ type ocConfig struct {
 	Contexts       []ocContext `json:"contexts"`
 	CurrentContext string      `json:"current-context"`
 }
-
-var unknownNamespace = "unknownNamespace"
 
 func runCommandListStreamOutput(commandList [][]string) {
 	for _, command := range commandList {
@@ -69,26 +82,45 @@ func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
 	return command.Status()
 }
 
-func ocGetCurrentNamespace(runAsOcUser string) string {
-	bytes, err := exec.Command("sudo", "-Eu", runAsOcUser, "oc", "config", "view", "-o", "json").Output()
-	if err != nil {
-		log.Println(err)
-		return unknownNamespace
+// Gets the current OpenShift namespace.
+func ocGetCurrentNamespace(runAsOcUser string) (string, error) {
+	commandName := "oc"
+	var commandArgs []string
+
+	if len(runAsOcUser) > 0 {
+		commandName = "sudo"
+		commandArgs = []string{"-Eu", runAsOcUser, "oc", "config", "view", "-o", "json"}
+	} else {
+		commandArgs = []string{"config", "view", "-o", "json"}
 	}
+
+	bytes, err := exec.Command(
+		commandName,
+		commandArgs...).Output()
+
+	if err != nil {
+		return "", err
+	}
+
 	var config ocConfig
-	json.Unmarshal(bytes, &config)
+	err = json.Unmarshal(bytes, &config)
+	if err != nil {
+		return "", err
+	}
 
 	currentContext := config.CurrentContext
 
 	for _, context := range config.Contexts {
 		if context.Name == currentContext {
-			return context.Context["namespace"]
+			return context.Context["namespace"], nil
 		}
 	}
 
-	return unknownNamespace
+	err = fmt.Errorf("current context not found: %s", currentContext)
+	return "", err
 }
 
+// Gets free/unused network ports
 func getFreePorts(numPorts int) ([]int, error) {
 	var ports []int
 

@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Jose Cueto <pepedocs@gmail.com>
+Copyright © 2023 Jose Cueto
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -39,11 +41,51 @@ var clusterLoginCmd = &cobra.Command{
 		configureDirs()
 		ocmLogin()
 		ocmBackplaneLogin()
+		processOpenShiftServiceReference()
 		initTerminal()
 	},
 	Args: cobra.ExactArgs(1),
 }
 
+// Processes OpenShift service references described in the ocm workpsace config
+func processOpenShiftServiceReference() {
+	var svcHostPortBindList serviceHostPortBindList
+	envVar := strings.TrimSpace(os.Getenv("HOST_PORT_MAPS"))
+	envVar = strings.Trim(envVar, "\"")
+	err := yaml.Unmarshal([]byte(envVar), &svcHostPortBindList)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal environment variable value HOST_PORT_MAPS %s: %s", envVar, err)
+	}
+
+	if len(svcHostPortBindList.ServiceHostPortBinds) == 0 {
+		log.Println("No service/host ports to bind.")
+	}
+
+	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	for _, portBind := range svcHostPortBindList.ServiceHostPortBinds {
+		params := []string{
+			"-Eu",
+			ocmUser,
+			"oc",
+			"port-forward",
+			portBind.SourceName,
+			"--address",
+			"0.0.0.0",
+			fmt.Sprintf("%s:%s", strconv.Itoa(portBind.HostPort), strconv.Itoa(portBind.ServicePort)),
+			"-n",
+			portBind.Namespace,
+		}
+		log.Printf("Forwarding %s/%s port to %s", portBind.ParentService, portBind.ServiceName, strconv.Itoa(portBind.HostPort))
+		cmd := exec.Command("sudo", params...)
+		err := cmd.Start()
+		if err != nil {
+			log.Printf("Failed to port forward %s: %s\n", strconv.Itoa(portBind.ServicePort), err)
+		}
+
+	}
+}
+
+// Initializes a bash terminal for ocm workspace
 func initTerminal() {
 	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	userHome := fmt.Sprintf("/home/%s", ocmUser)
@@ -58,7 +100,7 @@ func initTerminal() {
 		defer file.Close()
 
 		ps1String := fmt.Sprintf(
-			"\nPS1='[%s@%s $(/usr/bin/workspace currentNamespace %s)]$ '\n",
+			"\nPS1='[%s@%s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
 			ocmUser, cluster, ocmUser,
 		)
 		_, err = file.WriteString(ps1String)
@@ -79,6 +121,7 @@ func initTerminal() {
 	cmd.Run()
 }
 
+// Logs in a user in to an OCM cluster
 func ocmBackplaneLogin() {
 	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	cluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
@@ -98,6 +141,7 @@ func ocmBackplaneLogin() {
 	log.Println("OCM backplane login successful.")
 }
 
+// Logs in a user in to OCM
 func ocmLogin() {
 	ocmToken := strings.TrimSpace(os.Getenv("OCM_TOKEN"))
 	ocmEnvironment := strings.TrimSpace(os.Getenv("OCM_ENVIRONMENT"))
@@ -121,6 +165,7 @@ func ocmLogin() {
 	log.Println("OCM Login successful.")
 }
 
+// Configures the required directories in the ocm workspace container
 func configureDirs() {
 	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	userHome := fmt.Sprintf("/home/%s", ocmUser)
@@ -142,16 +187,6 @@ func configureDirs() {
 			fmt.Sprintf("%s/.config/ocm", userHome),
 		},
 		{
-			"mkdir",
-			"-p",
-			fmt.Sprintf("%s/.config/backplane", userHome),
-		},
-		{
-			"cp",
-			"/backplane-config",
-			fmt.Sprintf("%s/.config/backplane/", userHome),
-		},
-		{
 			"chown",
 			"-R",
 			fmt.Sprintf("%s:%s", ocmUser, ocmUser),
@@ -161,6 +196,7 @@ func configureDirs() {
 	runCommandListStreamOutput(commands)
 }
 
+// Configures the OCM user in the ocm workspace container
 func configureOcmUser() {
 	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	userHome := fmt.Sprintf("/home/%s", ocmUser)
