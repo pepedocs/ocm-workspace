@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Jose Cueto <pepedocs@gmail.com>
+Copyright © 2023 Jose Cueto
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,20 +18,36 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+)
+
+var (
+	currentNamespaceCmdArgs struct {
+		ocUser string
+	}
 )
 
 var currentNamespaceCmd = &cobra.Command{
 	Use:   "currentNamespace",
 	Short: "Shows OpenShift's current context namespace given an OpenShift user.",
 	Run: func(cmd *cobra.Command, args []string) {
-		ocUser := args[0]
-		namespace := ocGetCurrentNamespace(ocUser)
+		namespace, err := ocGetCurrentNamespace(currentNamespaceCmdArgs.ocUser)
+		if err != nil {
+			glog.Fatalf("Failed to get oc namespace: %s", err)
+		}
 		fmt.Print(namespace)
 	},
-	Args: cobra.ExactArgs(1),
 }
 
 func init() {
 	rootCmd.AddCommand(currentNamespaceCmd)
+	currentNamespaceCmd.Flags().StringVarP(
+		&currentNamespaceCmdArgs.ocUser,
+		"ocUser",
+		"u",
+		"",
+		"Run as OpenShift user.",
+	)
+	currentNamespaceCmd.MarkFlagRequired("ocUser")
 }
