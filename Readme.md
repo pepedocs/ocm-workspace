@@ -7,7 +7,7 @@ Provide a deployable and isolated (not 100%) environment for managing OSD cluste
 # Prerequisites
 1. Clone this repository.
 2. Installed podman, golang and make binaries.
-3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml. See [configuration](#configuration)
+3. An exactly named configuration file located in `/home/user/.ocm-workspace.yaml. See [configuration](#configuration) for more information on creating the barebones configuration.
 
 # Install
 To install run the following.
