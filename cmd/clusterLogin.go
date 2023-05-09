@@ -61,11 +61,11 @@ func processOpenShiftServiceReference() {
 		log.Println("No service/host ports to bind.")
 	}
 
-	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	for _, portBind := range svcHostPortBindList.ServiceHostPortBinds {
 		params := []string{
 			"-Eu",
-			ocmUser,
+			ocUser,
 			"oc",
 			"port-forward",
 			portBind.SourceName,
@@ -87,8 +87,8 @@ func processOpenShiftServiceReference() {
 
 // Initializes a bash terminal for ocm workspace
 func initTerminal() {
-	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	userHome := fmt.Sprintf("/home/%s", ocmUser)
+	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	userHome := fmt.Sprintf("/home/%s", ocUser)
 	cluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
 	userBashrcPath := fmt.Sprintf("%s/.bashrc", userHome)
 	runCommandStreamOutput("cp", "/terminal/bashrc", userBashrcPath)
@@ -101,7 +101,7 @@ func initTerminal() {
 
 		ps1String := fmt.Sprintf(
 			"\nPS1='[%s@%s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
-			ocmUser, cluster, ocmUser,
+			ocUser, cluster, ocUser,
 		)
 		_, err = file.WriteString(ps1String)
 		if err != nil {
@@ -112,7 +112,7 @@ func initTerminal() {
 	cmd := exec.Command(
 		"sudo",
 		"-Eu",
-		ocmUser,
+		ocUser,
 		"bash",
 	)
 	cmd.Stdout = os.Stdout
@@ -123,12 +123,12 @@ func initTerminal() {
 
 // Logs in a user in to an OCM cluster
 func ocmBackplaneLogin() {
-	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	cluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
 	status := runCommandStreamOutput(
 		"sudo",
 		"-Eu",
-		ocmUser,
+		ocUser,
 		"ocm",
 		"backplane",
 		"login",
@@ -145,14 +145,14 @@ func ocmBackplaneLogin() {
 func ocmLogin() {
 	ocmToken := strings.TrimSpace(os.Getenv("OCM_TOKEN"))
 	ocmEnvironment := strings.TrimSpace(os.Getenv("OCM_ENVIRONMENT"))
-	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 
 	log.Println("Logging into ocm", ocmEnvironment)
 
 	status := runCommandStreamOutput(
 		"sudo",
 		"-Eu",
-		ocmUser,
+		ocUser,
 		"ocm",
 		"login",
 		fmt.Sprintf("--token=%s", ocmToken),
@@ -167,8 +167,8 @@ func ocmLogin() {
 
 // Configures the required directories in the ocm workspace container
 func configureDirs() {
-	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	userHome := fmt.Sprintf("/home/%s", ocmUser)
+	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	userHome := fmt.Sprintf("/home/%s", ocUser)
 	commands := [][]string{
 		{
 			"mkdir",
@@ -178,7 +178,7 @@ func configureDirs() {
 		{
 			"chown",
 			"-R",
-			fmt.Sprintf("%s:%s", ocmUser, ocmUser),
+			fmt.Sprintf("%s:%s", ocUser, ocUser),
 			fmt.Sprintf("%s/.kube", userHome),
 		},
 		{
@@ -189,7 +189,7 @@ func configureDirs() {
 		{
 			"chown",
 			"-R",
-			fmt.Sprintf("%s:%s", ocmUser, ocmUser),
+			fmt.Sprintf("%s:%s", ocUser, ocUser),
 			fmt.Sprintf("%s/.config/ocm", userHome),
 		},
 	}
@@ -198,13 +198,13 @@ func configureDirs() {
 
 // Configures the OCM user in the ocm workspace container
 func configureOcmUser() {
-	ocmUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	userHome := fmt.Sprintf("/home/%s", ocmUser)
+	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
+	userHome := fmt.Sprintf("/home/%s", ocUser)
 	commands := [][]string{
 		{
 			"useradd",
 			"-m",
-			ocmUser,
+			ocUser,
 			"-d",
 			userHome,
 		},
@@ -212,7 +212,7 @@ func configureOcmUser() {
 			"usermod",
 			"-aG",
 			"wheel",
-			ocmUser,
+			ocUser,
 		},
 	}
 	runCommandListStreamOutput(commands)
