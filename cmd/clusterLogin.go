@@ -27,12 +27,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	clusterLoginCmdArgs struct {
-		cluster string
-	}
-)
-
 var clusterLoginCmd = &cobra.Command{
 	Use:   "clusterLogin",
 	Short: "Logs in to an OpenShift Dedicated cluster.",
@@ -44,7 +38,6 @@ var clusterLoginCmd = &cobra.Command{
 		processOpenShiftServiceReference()
 		initTerminal()
 	},
-	Args: cobra.ExactArgs(1),
 }
 
 // Processes OpenShift service references described in the ocm workpsace config
@@ -222,12 +215,4 @@ func configureOcmUser() {
 
 func init() {
 	rootCmd.AddCommand(clusterLoginCmd)
-
-	flags := clusterLoginCmd.Flags()
-	flags.StringVar(
-		&clusterLoginCmdArgs.cluster,
-		"cluster",
-		"",
-		"Cluster name or id.",
-	)
 }
