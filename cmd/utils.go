@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 
 	gocmd "github.com/go-cmd/cmd"
 )
@@ -82,8 +83,7 @@ func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
 	return command.Status()
 }
 
-// Gets the current OpenShift namespace.
-func ocGetCurrentNamespace(runAsOcUser string) (string, error) {
+func ocGetConfig(runAsOcUser string) (*ocConfig, error) {
 	commandName := "oc"
 	var commandArgs []string
 
@@ -99,11 +99,35 @@ func ocGetCurrentNamespace(runAsOcUser string) (string, error) {
 		commandArgs...).Output()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var config ocConfig
 	err = json.Unmarshal(bytes, &config)
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// Gets the current OpenShift cluster that a user is logged in.
+func ocGetCurrentOcmCluster(runAsOcUser string) (string, error) {
+	config, err := ocGetConfig(runAsOcUser)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(config.CurrentContext, "/")
+	if len(parts) > 2 {
+		return parts[1], nil
+	}
+
+	return "", nil
+
+}
+
+// Gets the current OpenShift namespace.
+func ocGetCurrentNamespace(runAsOcUser string) (string, error) {
+	config, err := ocGetConfig(runAsOcUser)
 	if err != nil {
 		return "", err
 	}

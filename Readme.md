@@ -7,27 +7,55 @@ Provide a deployable and isolated (not 100%) environment for managing OSD cluste
 # Prerequisites
 1. Clone this repository.
 2. Installed podman, golang and make binaries.
-3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration) for more information on creating the barebones configuration.
+3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
+4. An exactly named backplane configuration file located in `/home/<user>/.config/backplane/config.<prod|stage>.json`.
+
 
 # Install
-To install run the following.
+To install the ocm-workspace binary, run the following.
 
-`$ cd ocm-workspace && make install`
+```
+$ cd ocm-workspace
+$ make install
+```
 
-The binary called `workspace` will be built on the current directory.
+# Build ocm-workspace Image
+To build the ocm-workspace image, run the following.
 
-# Run
+```
+$ cd ocm-workspace
+$ make buildImage
+```
+
+# Log into an OSD cluster
 To run by logging into an OSD cluster run the following.
 
-`$ ./workspace login -c <cluster_name or id>`
+```
+$ ./workspace login -c <cluster_name or id>
+```
 
-A container will be created (see `podman ps`) and a bash terminal will be provided for running cluster management commands.
+A container will be created (see `podman ps`) and a bash terminal will be provided for running cluster management commands. The following is also done:
 
-`[<user>@<cluster name or id> <current kubernetes namespace>]$ `
+- OCM Login
+- OpenShift cluster login
 
+```
+[<user>@<cluster name or id> <current kubernetes namespace>]$
+```
+
+# Run ocm-workspace Without Logging into an OSD cluster
+```
+$ ./workspace login --isOcmLoginOnly
+```
+
+A container will be created and bash terminal will be provided for running cluster management commands.
+- OCM Login
 
 # Configuration
-ocm-workspace expects a file named `.ocm-workspace.yaml` in a user's home directory - `/home/<user>/.ocm-workspace.yaml`.
+**Prerequisites**
+1. `.ocm-workspace.yaml` in `/home/<user>/.ocm-workspace.yaml`
+2. `config.<prod|stage>.json` in `/home/<user>/.config/backplane`
+
 
 **Steps**
 1. Create the expected configuration file.
@@ -47,6 +75,8 @@ backplaneCLIVersion: "0.1.2"
 ```
 
 # Todo
-1. Tests
+1. Create tests
 2. Enhance error-handling
 3. Refactor
+4. Hooks/Plugins
+

@@ -4,3 +4,6 @@ build:
 
 install:
 	go install ocm-workspace
+
+buildImage:
+	./workspace build

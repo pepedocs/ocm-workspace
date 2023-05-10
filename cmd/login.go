@@ -72,6 +72,7 @@ var (
 		cluster        string
 		ocmEnvironment string
 		service        string
+		isOcmLoginOnly bool
 	}
 )
 
@@ -87,15 +88,16 @@ var loginCmd = &cobra.Command{
 		if len(loginCmdArgs.ocmEnvironment) > 0 {
 			ocmEnvironment = loginCmdArgs.ocmEnvironment
 		}
-		runOCMWorkspaceContainer(loginCmdArgs.cluster, ocmEnvironment, serviceRef)
+		runOCMWorkspaceContainer(loginCmdArgs.cluster, ocmEnvironment, serviceRef, loginCmdArgs.isOcmLoginOnly)
 	},
 }
 
 // Runs the OCM Workspace container using the image built by the "build" command
-func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string, serviceRef string) {
+func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string, serviceRef string, isOcmLoginOnly bool) {
 	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocUser"))
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", viper.GetString("ocmToken"))
 	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
+	envVarIsOCMLoginOnly := fmt.Sprintf("IS_OCM_LOGIN_ONLY=%v", isOcmLoginOnly)
 	userHome := fmt.Sprintf("/home/%s", viper.GetString("ocUser"))
 
 	// Paths to where these files are mounted in the workspace container
@@ -129,6 +131,8 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string, serviceR
 		envVarCluster,
 		"-e",
 		envVarBackplaneConfig,
+		"-e",
+		envVarIsOCMLoginOnly,
 		"-v",
 		volMapBackplaneConfig,
 		"-v",
@@ -225,6 +229,10 @@ func init() {
 		"OpenShift service reference.",
 	)
 
-	loginCmd.MarkFlagRequired("ocmCluster")
-
+	flags.BoolVar(
+		&loginCmdArgs.isOcmLoginOnly,
+		"isOcmLoginOnly",
+		false,
+		"Log in to OCM only.",
+	)
 }
