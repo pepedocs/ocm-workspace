@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -31,11 +32,17 @@ var clusterLoginCmd = &cobra.Command{
 	Use:   "clusterLogin",
 	Short: "Logs in to an OpenShift Dedicated cluster.",
 	Run: func(cmd *cobra.Command, args []string) {
+		isOcmLoginOnly, err := strconv.ParseBool(os.Getenv("IS_OCM_LOGIN_ONLY"))
+		if err != nil {
+			glog.Warning("Failed to parse environment variable: ", err)
+		}
 		configureOcmUser()
 		configureDirs()
 		ocmLogin()
-		ocmBackplaneLogin()
-		processOpenShiftServiceReference()
+		if !isOcmLoginOnly {
+			ocmBackplaneLogin()
+			processOpenShiftServiceReference()
+		}
 		initTerminal()
 	},
 }
@@ -93,7 +100,7 @@ func initTerminal() {
 		defer file.Close()
 
 		ps1String := fmt.Sprintf(
-			"\nPS1='[%s@%s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
+			"\nPS1='[%s %s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
 			ocUser, cluster, ocUser,
 		)
 		_, err = file.WriteString(ps1String)

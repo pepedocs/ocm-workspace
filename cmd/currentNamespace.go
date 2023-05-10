@@ -34,7 +34,7 @@ var currentNamespaceCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		namespace, err := ocGetCurrentNamespace(currentNamespaceCmdArgs.ocUser)
 		if err != nil {
-			glog.Fatalf("Failed to get oc namespace: %s", err)
+			glog.Warningf("Failed to get oc namespace: %s", err)
 		}
 		fmt.Print(namespace)
 	},
