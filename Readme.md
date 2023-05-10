@@ -10,6 +10,7 @@ Provide a deployable and isolated (not 100%) environment for managing OSD cluste
 3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
 4. An exactly named backplane configuration file located in `/home/<user>/.config/backplane/config.<prod|stage>.json`.
 
+
 # Install
 To install the ocm-workspace binary, run the following.
 
