@@ -22,31 +22,33 @@ import (
 )
 
 var (
-	currentNamespaceCmdArgs struct {
+	currentClusterCmdArgs struct {
 		ocUser string
 	}
 )
 
-var currentNamespaceCmd = &cobra.Command{
-	Use:   "currentNamespace",
-	Short: "Shows OpenShift's current context namespace given an OpenShift user.",
+// currentClusterCmd represents the currentCluster command
+var currentClusterCmd = &cobra.Command{
+	Use:   "currentCluster",
+	Short: "Shows the current cluster where a user is logged in.",
 	Run: func(cmd *cobra.Command, args []string) {
-		namespace, err := ocGetCurrentNamespace(currentNamespaceCmdArgs.ocUser)
+		cluster, err := ocGetCurrentOcmCluster(currentClusterCmdArgs.ocUser)
 		if err != nil {
 			fmt.Print("na")
 		}
-		fmt.Print(namespace)
+		fmt.Print(cluster)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(currentNamespaceCmd)
-	currentNamespaceCmd.Flags().StringVarP(
-		&currentNamespaceCmdArgs.ocUser,
+	rootCmd.AddCommand(currentClusterCmd)
+
+	currentClusterCmd.Flags().StringVarP(
+		&currentClusterCmdArgs.ocUser,
 		"ocUser",
 		"u",
 		"",
 		"Run as OpenShift user.",
 	)
-	currentNamespaceCmd.MarkFlagRequired("ocUser")
+	currentClusterCmd.MarkFlagRequired("ocUser")
 }

@@ -89,7 +89,6 @@ func processOpenShiftServiceReference() {
 func initTerminal() {
 	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
 	userHome := fmt.Sprintf("/home/%s", ocUser)
-	cluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
 	userBashrcPath := fmt.Sprintf("%s/.bashrc", userHome)
 	runCommandStreamOutput("cp", "/terminal/bashrc", userBashrcPath)
 
@@ -100,8 +99,8 @@ func initTerminal() {
 		defer file.Close()
 
 		ps1String := fmt.Sprintf(
-			"\nPS1='[%s %s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
-			ocUser, cluster, ocUser,
+			"\nPS1='[%s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentCluster -u %s) $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
+			ocUser, ocUser, ocUser,
 		)
 		_, err = file.WriteString(ps1String)
 		if err != nil {
