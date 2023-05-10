@@ -48,7 +48,7 @@ A container will be created (see `podman ps`) and a bash terminal will be provid
 $ ./workspace login --isOcmLoginOnly
 ```
 
-A container will be created and bash terminal will be provided for running cluster management commands.
+A container will be created and bash terminal will be provided for running cluster management commands. The following is also done:
 - OCM Login
 
 # Configuration
@@ -73,6 +73,31 @@ ocmCLIVersion: "0.1.60"
 rhocCLIVersion: "0.0.37"
 backplaneCLIVersion: "0.1.2"
 ```
+
+# Service Reference Configuration
+A service reference can be added in the configuration file to enable tool features relevant to a certain service. This feature is useful for accessing a service from the ocm-workspace's host (e.g. web console). Note that from the host's side, its port is only accessible through the loopback interface.
+
+For example the following will automatically forward the specified ports of service `nginx` to an ocm-workspace port that is also mapped to a host port.
+
+```
+# forward to host mapped ports
+services:
+  - name: nginx
+    forwardPorts:
+      - name: prometheus-console
+        namespace: nginx
+        source:
+          kind: pod
+          name: nginx-prometheus
+        port: 9090
+      - name: alertmanager-console
+        namespace: nginx
+        source:
+          kind: pod
+          name: nginx-alertmanager
+        port: 9093
+```
+
 
 # Todo
 1. Create tests
