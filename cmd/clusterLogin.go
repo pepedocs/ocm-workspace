@@ -76,6 +76,7 @@ func processOpenShiftServiceReference() {
 			portBind.Namespace,
 		}
 		log.Printf("Forwarding %s/%s port to %s", portBind.ParentService, portBind.ServiceName, strconv.Itoa(portBind.HostPort))
+
 		cmd := exec.Command("sudo", params...)
 		err := cmd.Start()
 		if err != nil {
@@ -192,7 +193,7 @@ func configureDirs() {
 			fmt.Sprintf("%s/.config/ocm", userHome),
 		},
 	}
-	runCommandListStreamOutput(commands)
+	runCommanLdListStreamOutput(commands)
 }
 
 // Configures the OCM user in the ocm workspace container
@@ -214,7 +215,7 @@ func configureOcmUser() {
 			ocUser,
 		},
 	}
-	runCommandListStreamOutput(commands)
+	runCommanLdListStreamOutput(commands)
 	line := []byte("\n%wheel         ALL = (ALL) NOPASSWD: ALL\n")
 	os.WriteFile("/etc/sudoer", line, 0644)
 }

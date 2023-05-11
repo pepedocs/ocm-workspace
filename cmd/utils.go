@@ -19,6 +19,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -35,52 +36,6 @@ type ocContext struct {
 type ocConfig struct {
 	Contexts       []ocContext `json:"contexts"`
 	CurrentContext string      `json:"current-context"`
-}
-
-func runCommandListStreamOutput(commandList [][]string) {
-	for _, command := range commandList {
-		runCommandStreamOutput(command[0], command[1:]...)
-	}
-}
-
-// Runs a blocking command (go-cmd) and streams its output.
-// https://github.com/go-cmd/cmd/blob/master/examples/blocking-streaming/main.go
-func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
-	cmdOptions := gocmd.Options{
-		Buffered:  false,
-		Streaming: true,
-	}
-	command := gocmd.NewCmdOptions(cmdOptions, cmdName, args...)
-
-	doneChan := make(chan struct{})
-
-	go func() {
-		defer close(doneChan)
-		// Done when both channels have been closed
-		// https://dave.cheney.net/2013/04/30/curious-channels
-		for command.Stdout != nil || command.Stderr != nil {
-			select {
-			case line, open := <-command.Stdout:
-				if !open {
-					command.Stdout = nil
-					continue
-				}
-				fmt.Println(line)
-			case line, open := <-command.Stderr:
-				if !open {
-					command.Stderr = nil
-					continue
-				}
-				fmt.Fprintln(os.Stderr, line)
-			}
-		}
-	}()
-
-	// Run and wait for Cmd to return, discard Status
-	<-command.Start()
-	// Wait for goroutine to print everything
-	<-doneChan
-	return command.Status()
 }
 
 func ocGetConfig(runAsOcUser string) (*ocConfig, error) {
@@ -163,4 +118,80 @@ func getFreePorts(numPorts int) ([]int, error) {
 	}
 	return ports, nil
 
+}
+
+func runCommand(cmdName string, cmdArgs ...string) error {
+	cmd := exec.Command(cmdName, cmdArgs...)
+	err := cmd.Run()
+	return err
+}
+
+func runCommandPipeStdin(cmdName string, cmdArgs ...string) ([]byte, error) {
+	cmd := exec.Command(cmdName, cmdArgs...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, "")
+	}()
+
+	return cmd.Output()
+}
+
+func runCommandWithOsFiles(cmdName string, stdout *os.File, stderr *os.File, stdin *os.File, cmdArgs ...string) error {
+	cmd := exec.Command(cmdName, cmdArgs...)
+	cmd.Stdout = stdout
+	cmd.Stdin = stdin
+	cmd.Stderr = stderr
+	err := cmd.Run()
+	return err
+}
+
+func runCommanLdListStreamOutput(commandList [][]string) {
+	for _, command := range commandList {
+		runCommandStreamOutput(command[0], command[1:]...)
+	}
+}
+
+// Runs a blocking command (go-cmd) and streams its output.
+// https://github.com/go-cmd/cmd/blob/master/examples/blocking-streaming/main.go
+func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
+	cmdOptions := gocmd.Options{
+		Buffered:  false,
+		Streaming: true,
+	}
+	command := gocmd.NewCmdOptions(cmdOptions, cmdName, args...)
+
+	doneChan := make(chan struct{})
+
+	go func() {
+		defer close(doneChan)
+		// Done when both channels have been closed
+		// https://dave.cheney.net/2013/04/30/curious-channels
+		for command.Stdout != nil || command.Stderr != nil {
+			select {
+			case line, open := <-command.Stdout:
+				if !open {
+					command.Stdout = nil
+					continue
+				}
+				fmt.Println(line)
+			case line, open := <-command.Stderr:
+				if !open {
+					command.Stderr = nil
+					continue
+				}
+				fmt.Fprintln(os.Stderr, line)
+			}
+		}
+	}()
+
+	// Run and wait for Cmd to return, discard Status
+	<-command.Start()
+	// Wait for goroutine to print everything
+	<-doneChan
+	return command.Status()
 }
