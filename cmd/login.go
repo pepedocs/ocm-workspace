@@ -88,12 +88,20 @@ var loginCmd = &cobra.Command{
 		if len(loginCmdArgs.ocmEnvironment) > 0 {
 			ocmEnvironment = loginCmdArgs.ocmEnvironment
 		}
-		runOCMWorkspaceContainer(loginCmdArgs.cluster, ocmEnvironment, serviceRef, loginCmdArgs.isOcmLoginOnly)
+		runOCMWorkspaceContainer(
+			loginCmdArgs.cluster,
+			ocmEnvironment,
+			serviceRef,
+			loginCmdArgs.isOcmLoginOnly)
 	},
 }
 
 // Runs the OCM Workspace container using the image built by the "build" command
-func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string, serviceRef string, isOcmLoginOnly bool) {
+func runOCMWorkspaceContainer(
+	ocmCluster string,
+	ocmEnvironment string,
+	serviceRef string,
+	isOcmLoginOnly bool) {
 	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocUser"))
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", viper.GetString("ocmToken"))
 	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
@@ -151,6 +159,9 @@ func runOCMWorkspaceContainer(ocmCluster string, ocmEnvironment string, serviceR
 
 	// Bind service ports to free host ports
 	for _, svcRefConf := range config.Services {
+		if svcRefConf.Name != serviceRef {
+			continue
+		}
 		for _, forwardPort := range svcRefConf.ForwardPorts {
 			ports, err := getFreePorts(1)
 			if err != nil {
@@ -226,7 +237,7 @@ func init() {
 		"service",
 		"s",
 		"",
-		"OpenShift service reference.",
+		"OpenShift service reference name.",
 	)
 
 	flags.BoolVar(
