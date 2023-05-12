@@ -16,9 +16,9 @@ limitations under the License.
 package cmd
 
 import (
+	"log"
 	"os"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"github.com/spf13/viper"
@@ -62,6 +62,6 @@ func initConfig() {
 	// If a config file is found, read it in.
 	err := viper.ReadInConfig()
 	if err != nil {
-		glog.Fatal("Failed to read config file: ", err)
+		log.Fatal("Failed to read config file: ", err)
 	}
 }

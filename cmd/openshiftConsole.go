@@ -16,18 +16,40 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+type ocDeploymentContainer struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
+}
+
+type ocDeploymentTemplateSpec struct {
+	Containers []ocDeploymentContainer `json:"containers"`
+}
+
+type ocDeploymentTemplate struct {
+	Spec ocDeploymentTemplateSpec `json:"spec"`
+}
+
+type ocDeploymentSpec struct {
+	Template ocDeploymentTemplate `json:"template"`
+}
+type ocDeployment struct {
+	Spec ocDeploymentSpec `json:"spec"`
+}
+
 var (
 	consoleCmdArgs struct {
 		workspaceContainerName string
-		workspaceContainerPort int
+		workspaceContainerPort string
 	}
 )
 
@@ -37,18 +59,158 @@ var openshiftConsoleCmd = &cobra.Command{
 	Short: "Launches an OpenShift console.",
 	Long:  `Launches an OpenShift console application in a separate container.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ocUser := viper.GetString("ocUser")
 		userHome := fmt.Sprintf("/home/%s", viper.GetString("hostUser"))
 		out, err := runCommandPipeStdin("ocm", "post", "/api/accounts_mgmt/v1/access_token")
 		if err != nil {
-			glog.Fatal("Failed to run command: ", err)
+			log.Fatal("Failed to run command: ", err)
 		}
 		path := fmt.Sprintf("%s/.kube/ocm-pull-secret/config.json", userHome)
 		file, err := os.OpenFile(path, os.O_WRONLY, 0644)
 		if err != nil {
-			glog.Fatal("Failed to open file: ", err)
+			log.Fatal("Failed to open file: ", err)
 		}
 		defer file.Close()
 		file.WriteString(string(out))
+
+		containerName := fmt.Sprintf("%s-openshift-console", consoleCmdArgs.workspaceContainerName)
+		kubeConfigFileName := fmt.Sprintf("%s/.kube/ocm-pull-secret/config.json", userHome)
+		consoleListenAddr := fmt.Sprintf("http://0.0.0.0:%s", consoleCmdArgs.workspaceContainerPort)
+		pullArgs := []string{"pull", "--quiet", "--authfile", kubeConfigFileName}
+		runArgs := []string{
+			"run",
+			"--rm",
+			"--network",
+			fmt.Sprintf("container:%s", consoleCmdArgs.workspaceContainerName),
+			"-e",
+			"HTTPS_PROXY=http://squid.corp.redhat.com:3128",
+			"--name",
+			containerName,
+			"--authfile",
+			kubeConfigFileName,
+		}
+
+		out, err = runCommandOutput(
+			"podman",
+			"exec",
+			"-it",
+			"--user",
+			ocUser,
+			consoleCmdArgs.workspaceContainerName,
+			"oc",
+			"get",
+			"deployment",
+			"console",
+			"-n",
+			"openshift-console",
+			"-o",
+			"json",
+		)
+		if err != nil {
+			log.Fatal("Failed to run command: ", err)
+		}
+		var openShiftConsoleDeploy ocDeployment
+		var consoleImage string
+		err = json.Unmarshal(out, &openShiftConsoleDeploy)
+		if err != nil {
+			log.Fatal("Failed to unmarshal: ", err)
+		}
+		fmt.Println(openShiftConsoleDeploy)
+
+		for _, container := range openShiftConsoleDeploy.Spec.Template.Spec.Containers {
+			if container.Name == "console" {
+				consoleImage = container.Image
+				break
+			}
+		}
+
+		out, err = runCommandOutput(
+			"podman",
+			"exec",
+			"-it",
+			"--user",
+			ocUser,
+			consoleCmdArgs.workspaceContainerName,
+			"oc",
+			"config",
+			"view",
+			"-o",
+			"json",
+		)
+		if err != nil {
+			log.Fatal("Failed to run command: ", err)
+		}
+
+		var config ocConfig
+		err = json.Unmarshal(out, &config)
+		if err != nil {
+			log.Fatal("Failed to unmarshal: ", err)
+		}
+
+		imagePullArgs := append(pullArgs, consoleImage)
+		_, err = runCommandOutput(
+			"podman",
+			imagePullArgs...,
+		)
+		if err != nil {
+			log.Fatal("Failed to run command: ", err)
+		}
+		cluster := config.Clusters[0]
+		apiUrl := cluster.ClusterUrls.Server
+		alertManagerUrl := strings.Replace(apiUrl, "/backplane/cluster", "/backplane/alertmanager", 1)
+		thanosUrl := strings.Replace(apiUrl, "/backplane/cluster", "/backplane/thanos", 1)
+		alertManagerUrl = strings.TrimRight(alertManagerUrl, "/")
+		thanosUrl = strings.TrimRight(thanosUrl, "/")
+
+		out, err = runCommandOutput(
+			"podman",
+			"exec",
+			"-it",
+			"--user",
+			ocUser,
+			consoleCmdArgs.workspaceContainerName,
+			"ocm",
+			"token",
+		)
+		if err != nil {
+			log.Fatal("Failed to run command: ", err)
+		}
+		ocmToken := strings.TrimSpace(string(out))
+		baseAddress := fmt.Sprintf("http://127.0.0.1:%s", consoleCmdArgs.workspaceContainerPort)
+		runArgs = append(
+			runArgs,
+			consoleImage,
+			"/opt/bridge/bin/bridge",
+			"--public-dir",
+			"/opt/bridge/static",
+			"-base-address",
+			baseAddress,
+			"-branding",
+			"dedicated",
+			"-documentation-base-url",
+			"https://docs.openshift.com/dedicated/4/",
+			"-user-settings-location",
+			"localstorage",
+			"-user-auth",
+			"disabled",
+			"-k8s-mode",
+			"off-cluster",
+			"-k8s-auth",
+			"bearer-token",
+			"-k8s-mode-off-cluster-endpoint",
+			apiUrl,
+			"-k8s-mode-off-cluster-alertmanager",
+			alertManagerUrl,
+			"-k8s-mode-off-cluster-thanos",
+			thanosUrl,
+			"-k8s-auth-bearer-token",
+			ocmToken,
+			"-listen",
+			consoleListenAddr,
+			"-v",
+			"5",
+		)
+		runCommandWithOsFiles("podman", os.Stdout, os.Stderr, os.Stdin, runArgs...)
 	},
 }
 
@@ -64,9 +226,8 @@ func init() {
 		"The running workspace container name that is logged into an OpenShift cluster.",
 	)
 
-	port := fmt.Sprintf("%v", &consoleCmdArgs.workspaceContainerPort)
 	flags.StringVarP(
-		&port,
+		&consoleCmdArgs.workspaceContainerPort,
 		"workspaceContainerPort",
 		"p",
 		"",
