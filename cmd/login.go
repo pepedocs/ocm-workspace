@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strconv"
 
+	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -155,6 +155,20 @@ func runOCMWorkspaceContainer(
 		log.Fatal("Failed to unmarshal config: ", err)
 	}
 
+	// Allocate free port and map host port for OpenShift console
+	ports, err := getFreePorts(1)
+	if err != nil {
+		glog.Fatal("Failed to generate port for Openshift console: ", err)
+	}
+
+	portStr := strconv.Itoa(ports[0])
+	envVarOpenShiftConsolePort := fmt.Sprintf("OPENSHIFT_CONSOLE_PORT=%s", portStr)
+	commandArgs = append(commandArgs, "-e")
+	commandArgs = append(commandArgs, envVarOpenShiftConsolePort)
+	openShiftConsolePortMap := fmt.Sprintf("127.0.0.1:%s:%s", portStr, portStr)
+	commandArgs = append(commandArgs, "-p")
+	commandArgs = append(commandArgs, openShiftConsolePortMap)
+
 	var portBindList serviceHostPortBindList
 
 	// Bind service ports to free host ports
@@ -205,11 +219,10 @@ func runOCMWorkspaceContainer(
 		"--config",
 		ocmWorkspaceConfigPath,
 	)
-	cmd := exec.Command("podman", commandArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Run()
+	err = runCommandWithOsFiles("podman", os.Stdout, os.Stderr, os.Stdin, commandArgs...)
+	if err != nil {
+		log.Fatal("Failed to run command: ", err)
+	}
 }
 
 func init() {

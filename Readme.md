@@ -19,7 +19,7 @@ $ cd ocm-workspace
 $ make install
 ```
 
-# Build ocm-workspace Image
+# Build ocm-workspace image
 To build the ocm-workspace image, run the following.
 
 ```
@@ -34,7 +34,7 @@ To run by logging into an OSD cluster run the following.
 $ ./workspace login -c <cluster_name or id>
 ```
 
-A container will be created (see `podman ps`) and a bash terminal will be provided for running cluster management commands. The following is also done:
+A container will be created (see `podman ps`) and a bash terminal will be provided for running cluster management commands. The following operations are executed automatically:
 
 - OCM Login
 - OpenShift cluster login
@@ -43,13 +43,29 @@ A container will be created (see `podman ps`) and a bash terminal will be provid
 [<user>@<cluster name or id> <current kubernetes namespace>]$
 ```
 
-# Run ocm-workspace Without Logging into an OSD cluster
+# Run ocm-workspace without logging into an OSD cluster
 ```
 $ ./workspace login --isOcmLoginOnly
 ```
 
-A container will be created and bash terminal will be provided for running cluster management commands. The following is also done:
+A container will be created and bash terminal will be provided for running cluster management commands. The following operations are executed automatically:
 - OCM Login
+
+# Launch an OpenShift console for a running ocm-workspace container
+**Steps**
+1. Get the running ocm-workspace container name by searching it in `podman ps`. The name is in the form of `ow-<cluster name>-uid`
+2. In the running ocm-workspace container get the value of the environment variable `OPENSHIFT_CONSOLE_PORT`.
+3. Run the follwing command.
+
+```
+$ ./workspace openshiftConsole -c ow-<cluster name>-uid <value of OPENSHIFT_CONSOLE_PORT>
+```
+4. The OpenShift console will be available in your browser.
+
+```
+http://localhost:<value of OPENSHIFT_CONSOLE_PORT>
+```
+
 
 # Configuration
 **Prerequisites**

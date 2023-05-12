@@ -19,11 +19,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -34,7 +32,7 @@ var clusterLoginCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		isOcmLoginOnly, err := strconv.ParseBool(os.Getenv("IS_OCM_LOGIN_ONLY"))
 		if err != nil {
-			glog.Warning("Failed to parse environment variable: ", err)
+			log.Println("Failed to parse environment variable: ", err)
 		}
 		configureOcmUser()
 		configureDirs()
@@ -42,6 +40,8 @@ var clusterLoginCmd = &cobra.Command{
 		if !isOcmLoginOnly {
 			ocmBackplaneLogin()
 			processOpenShiftServiceReference()
+			envVarOpenShiftConsolePort := strings.TrimSpace(os.Getenv("OPENSHIFT_CONSOLE_PORT"))
+			log.Println("OpenShift console port: ", envVarOpenShiftConsolePort)
 		}
 		initTerminal()
 	},
@@ -76,8 +76,8 @@ func processOpenShiftServiceReference() {
 			portBind.Namespace,
 		}
 		log.Printf("Forwarding %s/%s port to %s", portBind.ParentService, portBind.ServiceName, strconv.Itoa(portBind.HostPort))
-		cmd := exec.Command("sudo", params...)
-		err := cmd.Start()
+
+		err := runCommand("sudo", params...)
 		if err != nil {
 			log.Printf("Failed to port forward %s: %s\n", strconv.Itoa(portBind.ServicePort), err)
 		}
@@ -108,16 +108,10 @@ func initTerminal() {
 		}
 
 	}
-	cmd := exec.Command(
-		"sudo",
-		"-Eu",
-		ocUser,
-		"bash",
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Run()
+	err = runCommandWithOsFiles("sudo", os.Stdout, os.Stderr, os.Stdin, "-Eu", ocUser, "bash")
+	if err != nil {
+		log.Fatal("Failed to run command: ", err)
+	}
 }
 
 // Logs in a user in to an OCM cluster
@@ -192,7 +186,7 @@ func configureDirs() {
 			fmt.Sprintf("%s/.config/ocm", userHome),
 		},
 	}
-	runCommandListStreamOutput(commands)
+	runCommanLdListStreamOutput(commands)
 }
 
 // Configures the OCM user in the ocm workspace container
@@ -214,7 +208,7 @@ func configureOcmUser() {
 			ocUser,
 		},
 	}
-	runCommandListStreamOutput(commands)
+	runCommanLdListStreamOutput(commands)
 	line := []byte("\n%wheel         ALL = (ALL) NOPASSWD: ALL\n")
 	os.WriteFile("/etc/sudoer", line, 0644)
 }
