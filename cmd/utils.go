@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -133,14 +132,14 @@ func getFreePorts(numPorts int) ([]int, error) {
 }
 
 func runCommand(cmdName string, cmdArgs ...string) error {
-	log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
+	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
 	cmd := exec.Command(cmdName, cmdArgs...)
 	err := cmd.Run()
 	return err
 }
 
 func runCommandPipeStdin(cmdName string, cmdArgs ...string) ([]byte, error) {
-	log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
+	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
 	cmd := exec.Command(cmdName, cmdArgs...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -156,13 +155,13 @@ func runCommandPipeStdin(cmdName string, cmdArgs ...string) ([]byte, error) {
 }
 
 func runCommandOutput(cmdName string, cmdArgs ...string) ([]byte, error) {
-	log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
+	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
 	cmd := exec.Command(cmdName, cmdArgs...)
 	return cmd.Output()
 }
 
 func runCommandWithOsFiles(cmdName string, stdout *os.File, stderr *os.File, stdin *os.File, cmdArgs ...string) error {
-	log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
+	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
 	cmd := exec.Command(cmdName, cmdArgs...)
 	cmd.Stdout = stdout
 	cmd.Stdin = stdin
@@ -180,7 +179,7 @@ func runCommanLdListStreamOutput(commandList [][]string) {
 // Runs a blocking command (go-cmd) and streams its output.
 // https://github.com/go-cmd/cmd/blob/master/examples/blocking-streaming/main.go
 func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
-	log.Printf("Running command: %s %s\n", cmdName, args)
+	// log.Printf("Running command: %s %s\n", cmdName, args)
 
 	cmdOptions := gocmd.Options{
 		Buffered:  false,
