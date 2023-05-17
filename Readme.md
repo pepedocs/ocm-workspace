@@ -2,7 +2,7 @@
 A containerised workspace or environment for running OpenShift Dedicated (OSD) cluster management tools (e.g. ocm-cli, oc, etc).
 
 # Goal
-Provide a deployable and isolated (not 100%) environment for managing OSD clusters.
+Provide a deployable and isolated (container-isolation only) environment for managing OSD clusters.
 
 # Prerequisites
 1. Clone this repository.
