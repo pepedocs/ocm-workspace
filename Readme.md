@@ -65,7 +65,7 @@ A container will be created and bash terminal will be provided for running clust
 # OCM/OSD
 ocUser: <OCM user name>
 ocmEnvironment: <production or staging>
-ocmToken: "<OCM token>"
+backplaneConfigProd: "<BACKPLANE CONFIG FILENAME>"
 
 # container build params
 baseImage: "fedora:37"
