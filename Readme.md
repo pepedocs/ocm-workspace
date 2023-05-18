@@ -8,11 +8,10 @@ Provide a deployable and isolated (container-isolation only) environment for man
 1. Clone this repository.
 2. Installed podman, golang and make binaries.
 3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
-4. An exactly named backplane configuration file located in `/home/<user>/.config/backplane/config.<prod|stage>.json`.
 
 
 # Install
-To install the ocm-workspace binary, run the following.
+To install the ocm-workspace binary in your $GOPATH, run the following.
 
 ```
 $ cd ocm-workspace
@@ -31,7 +30,7 @@ $ make buildImage
 To run by logging into an OSD cluster run the following.
 
 ```
-$ ./workspace login -c <cluster_name or id>
+$ workspace login -c <cluster_name or id>
 ```
 
 A container will be created (see `podman ps`) and a bash terminal will be provided for running cluster management commands. The following operations are executed automatically:
@@ -81,7 +80,10 @@ http://localhost:<value of OPENSHIFT_CONSOLE_PORT>
 # OCM/OSD
 ocUser: <OCM user name>
 ocmEnvironment: <production or staging>
-ocmToken: "<OCM token>"
+backplaneConfigProd: "<production backplane config file path>"
+
+# Host
+userHome: "<Path to user's home directory.>"
 
 # container build params
 baseImage: "fedora:37"
@@ -115,9 +117,4 @@ services:
 ```
 
 
-# Todo
-1. Create tests
-2. Enhance error-handling
-3. Refactor
-4. Hooks/Plugins
-
+[![build](https://github.com/pepedocs/ocm-workspace/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/pepedocs/ocm-workspace/actions/workflows/build.yml)
