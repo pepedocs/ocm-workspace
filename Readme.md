@@ -118,9 +118,4 @@ services:
 ```
 
 
-# Todo
-1. Create tests
-2. Enhance error-handling
-3. Refactor
-4. Hooks/Plugins
-
+[![build](https://github.com/pepedocs/ocm-workspace/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/pepedocs/ocm-workspace/actions/workflows/build.yml)
