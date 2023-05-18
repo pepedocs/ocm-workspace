@@ -81,7 +81,7 @@ http://localhost:<value of OPENSHIFT_CONSOLE_PORT>
 # OCM/OSD
 ocUser: <OCM user name>
 ocmEnvironment: <production or staging>
-ocmToken: "<OCM token>"
+backplaneConfigProd: "<BACKPLANE CONFIG FILENAME>"
 
 # container build params
 baseImage: "fedora:37"
