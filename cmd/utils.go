@@ -49,6 +49,18 @@ type ocConfig struct {
 	Clusters       []ocCluster `json:"clusters"`
 }
 
+func ocmGetOCMToken() (string, error) {
+	out, err := exec.Command("ocm", "token").Output()
+	var ocmToken string
+	if err == nil {
+		ocmToken = string(out[:])
+		if len(ocmToken) < 2000 {
+			err = fmt.Errorf(ocmToken)
+		}
+	}
+	return ocmToken, err
+}
+
 func ocGetConfig(runAsOcUser string) (*ocConfig, error) {
 	commandName := "oc"
 	var commandArgs []string
@@ -131,23 +143,17 @@ func getFreePorts(numPorts int) ([]int, error) {
 
 }
 
-// Get the latest OCM_TOKEN from the local environment
-func getOCMToken() (string, error) {
-	out, err := exec.Command("ocm", "token").Output()
-	var ocmToken string
-	if err == nil {
-		ocmToken = string(out[:])
-		if len(ocmToken) < 2000 {
-			err = fmt.Errorf(ocmToken)
-		}
-	}
-	return ocmToken, err
-}
 func runCommand(cmdName string, cmdArgs ...string) error {
 	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
 	cmd := exec.Command(cmdName, cmdArgs...)
 	err := cmd.Run()
 	return err
+}
+
+func runCommandOutput(cmdName string, cmdArgs ...string) ([]byte, error) {
+	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
+	cmd := exec.Command(cmdName, cmdArgs...)
+	return cmd.Output()
 }
 
 func runCommandPipeStdin(cmdName string, cmdArgs ...string) ([]byte, error) {
