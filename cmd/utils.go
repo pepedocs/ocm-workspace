@@ -164,3 +164,16 @@ func getFreePorts(numPorts int) ([]int, error) {
 	return ports, nil
 
 }
+
+// Get the latest OCM_TOKEN from the local environment
+func getOCMToken() (string, error) {
+	out, err := exec.Command("ocm", "token").Output()
+	var ocmToken string
+	if err == nil {
+		ocmToken = string(out[:])
+		if len(ocmToken) < 2000 {
+			err = fmt.Errorf(ocmToken)
+		}
+	}
+	return ocmToken, err
+}

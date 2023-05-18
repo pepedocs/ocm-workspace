@@ -103,20 +103,16 @@ func runOCMWorkspaceContainer(
 	serviceRef string,
 	isOcmLoginOnly bool) {
 	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocUser"))
-	// envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", viper.GetString("ocmToken"))
 	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
 	envVarIsOCMLoginOnly := fmt.Sprintf("IS_OCM_LOGIN_ONLY=%v", isOcmLoginOnly)
 	userHome := fmt.Sprintf("%s", viper.GetString("userHome"))
 
 	// Fetch the latest OCM_TOKEN
-	out, err := exec.Command("ocm", "token").Output()
+	ocmToken, err := getOCMToken()
 	if err != nil {
 		log.Fatal("Failed to fetch the token: ", err)
 	}
-	ocmToken := string(out[:])
-	if len(ocmToken) < 2000 {
-		log.Fatal(ocmToken)
-	}
+	// set the OCM_TOKEN environment
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", ocmToken)
 
 	// Paths to where these files are mounted in the workspace container
