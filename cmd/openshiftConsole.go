@@ -60,7 +60,7 @@ var openshiftConsoleCmd = &cobra.Command{
 	Long:  `Launches an OpenShift console application in a separate container.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ocUser := viper.GetString("ocUser")
-		userHome := fmt.Sprintf("/home/%s", viper.GetString("hostUser"))
+		userHome := viper.GetString("userHome")
 		out, err := runCommandPipeStdin("ocm", "post", "/api/accounts_mgmt/v1/access_token")
 		if err != nil {
 			log.Fatal("Failed to run command: ", err)

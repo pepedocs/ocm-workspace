@@ -49,6 +49,18 @@ type ocConfig struct {
 	Clusters       []ocCluster `json:"clusters"`
 }
 
+func ocmGetOCMToken() (string, error) {
+	out, err := exec.Command("ocm", "token").Output()
+	var ocmToken string
+	if err == nil {
+		ocmToken = string(out[:])
+		if len(ocmToken) < 2000 {
+			err = fmt.Errorf(ocmToken)
+		}
+	}
+	return ocmToken, err
+}
+
 func ocGetConfig(runAsOcUser string) (*ocConfig, error) {
 	commandName := "oc"
 	var commandArgs []string

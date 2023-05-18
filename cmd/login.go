@@ -103,18 +103,23 @@ func runOCMWorkspaceContainer(
 	serviceRef string,
 	isOcmLoginOnly bool) {
 	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocUser"))
-	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", viper.GetString("ocmToken"))
 	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
 	envVarIsOCMLoginOnly := fmt.Sprintf("IS_OCM_LOGIN_ONLY=%v", isOcmLoginOnly)
-	userHome := fmt.Sprintf("/home/%s", viper.GetString("ocUser"))
+	userHome := viper.GetString("userHome")
 
+	ocmToken, err := ocmGetOCMToken()
+	if err != nil {
+		log.Fatal("Failed to fetch the token: ", err)
+	}
+	// set the OCM_TOKEN environment
+	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", ocmToken)
 	// Paths to where these files are mounted in the workspace container
 	containerBackplaneConfigPath := "/backplane-config.json"
 	ocmWorkspaceConfigPath := "/.ocm-workspace.yaml"
 
-	volMapBackplaneConfig := fmt.Sprintf("%s/.config/backplane/config.prod.json:%s:ro", userHome, containerBackplaneConfigPath)
+	volMapBackplaneConfig := fmt.Sprintf("%s/.config/backplane/%s:%s:ro", userHome, viper.GetString("backplaneConfigProd"), containerBackplaneConfigPath)
 	if ocmEnvironment == "staging" {
-		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/config.stage.json:%s:ro", userHome, containerBackplaneConfigPath)
+		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/%s:%s:ro", userHome, viper.GetString("backplaneConfigStage"), containerBackplaneConfigPath)
 	}
 
 	volMapTerminalDir := "./terminal:/terminal:ro"
@@ -150,7 +155,7 @@ func runOCMWorkspaceContainer(
 	}
 
 	var config ocmWorkspaceConfig
-	err := viper.Unmarshal(&config)
+	err = viper.Unmarshal(&config)
 	if err != nil {
 		log.Fatal("Failed to unmarshal config: ", err)
 	}
