@@ -8,7 +8,6 @@ Provide a deployable and isolated (container-isolation only) environment for man
 1. Clone this repository.
 2. Installed podman, golang and make binaries.
 3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
-4. An exactly named backplane configuration file located in `/home/<user>/.config/backplane/config.<prod|stage>.json`.
 
 
 # Install
