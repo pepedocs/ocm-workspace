@@ -64,7 +64,8 @@ type serviceRefConfig struct {
 }
 
 type ocmWorkspaceConfig struct {
-	Services []serviceRefConfig `mapstructure:"services"`
+	Services  []serviceRefConfig `mapstructure:"services"`
+	SharedDir string             `mapstructure:"sharedDir"`
 }
 
 var (
@@ -107,6 +108,13 @@ func runOCMWorkspaceContainer(
 	envVarIsOCMLoginOnly := fmt.Sprintf("IS_OCM_LOGIN_ONLY=%v", isOcmLoginOnly)
 	userHome := viper.GetString("userHome")
 
+	var config ocmWorkspaceConfig
+	err := viper.Unmarshal(&config)
+	if err != nil {
+		log.Fatal("Failed to unmarshal config: ", err)
+	}
+
+	// Fetch the latest OCM_TOKEN
 	ocmToken, err := ocmGetOCMToken()
 	if err != nil {
 		log.Fatal("Failed to fetch the token: ", err)
@@ -122,6 +130,7 @@ func runOCMWorkspaceContainer(
 		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/%s:%s:ro", userHome, viper.GetString("backplaneConfigStage"), containerBackplaneConfigPath)
 	}
 
+	volMapSharedDir := fmt.Sprintf("%s:/ocm-workspace/shared", config.SharedDir)
 	volMapTerminalDir := "./terminal:/terminal:ro"
 	volMapOcmWorkspaceConfig := fmt.Sprintf("%s/.ocm-workspace.yaml:%s:ro", userHome, ocmWorkspaceConfigPath)
 	envVarOcmEnvironment := fmt.Sprintf("OCM_ENVIRONMENT=%s", ocmEnvironment)
@@ -152,12 +161,8 @@ func runOCMWorkspaceContainer(
 		volMapTerminalDir,
 		"-v",
 		volMapOcmWorkspaceConfig,
-	}
-
-	var config ocmWorkspaceConfig
-	err = viper.Unmarshal(&config)
-	if err != nil {
-		log.Fatal("Failed to unmarshal config: ", err)
+		"-v",
+		volMapSharedDir,
 	}
 
 	// Allocate free port and map host port for OpenShift console
