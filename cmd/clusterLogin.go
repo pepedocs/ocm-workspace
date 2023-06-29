@@ -82,7 +82,6 @@ func processOpenShiftServiceReference() {
 		if err != nil {
 			log.Printf("Failed to port forward %s: %s\n", strconv.Itoa(portBind.ServicePort), err)
 		}
-
 	}
 }
 
@@ -185,6 +184,12 @@ func configureDirs() {
 			"-R",
 			fmt.Sprintf("%s:%s", ocUser, ocUser),
 			fmt.Sprintf("%s/.config/ocm", userHome),
+		},
+		{
+			"chown",
+			"-R",
+			fmt.Sprintf("%s:%s", ocUser, ocUser),
+			"/ocm-workspace/shared",
 		},
 	}
 	runCommandListStreamOutput(commands)

@@ -32,7 +32,7 @@ RUN dnf update -y && \
     mv $PWD/oc /usr/bin/oc && \
     mv $PWD/kubectl /usr/bin/kubectl
 
-RUN mkdir /ocm-workspace
+RUN mkdir -p /ocm-workspace/shared
 WORKDIR /ocm-workspace
 ADD ./workspace .
 RUN chmod +x ./workspace && cp ./workspace /usr/bin/workspace
