@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -148,6 +149,23 @@ func runCommand(cmdName string, cmdArgs ...string) error {
 	cmd := exec.Command(cmdName, cmdArgs...)
 	err := cmd.Run()
 	return err
+}
+
+func runCommandBackground(cmdName string, cmdArgs ...string) error {
+	// log.Printf("Running command: %s %s\n", cmdName, cmdArgs)
+	cmd := exec.Command(cmdName, cmdArgs...)
+	err := cmd.Start()
+
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		err = cmd.Wait()
+		log.Printf("Command finished with error: %v", err)
+	}()
+
+	return nil
 }
 
 func runCommandOutput(cmdName string, cmdArgs ...string) ([]byte, error) {
