@@ -78,7 +78,8 @@ func processOpenShiftServiceReference() {
 		}
 		log.Printf("Forwarding %s/%s port to %s", portBind.ParentService, portBind.ServiceName, strconv.Itoa(portBind.HostPort))
 
-		err := runCommand("sudo", params...)
+		err := runCommandBackground("sudo", params...)
+		//err := runCommand("sudo", params...)
 		if err != nil {
 			log.Printf("Failed to port forward %s: %s\n", strconv.Itoa(portBind.ServicePort), err)
 		}
