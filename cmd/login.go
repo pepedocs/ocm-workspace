@@ -130,7 +130,6 @@ func runOCMWorkspaceContainer(
 		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/%s:%s:ro", userHome, viper.GetString("backplaneConfigStage"), containerBackplaneConfigPath)
 	}
 
-	volMapSharedDir := fmt.Sprintf("%s:/ocm-workspace/shared", config.SharedDir)
 	volMapTerminalDir := "./terminal:/terminal:ro"
 	volMapOcmWorkspaceConfig := fmt.Sprintf("%s/.ocm-workspace.yaml:%s:ro", userHome, ocmWorkspaceConfigPath)
 	envVarOcmEnvironment := fmt.Sprintf("OCM_ENVIRONMENT=%s", ocmEnvironment)
@@ -161,8 +160,11 @@ func runOCMWorkspaceContainer(
 		volMapTerminalDir,
 		"-v",
 		volMapOcmWorkspaceConfig,
-		"-v",
-		volMapSharedDir,
+	}
+
+	if len(config.SharedDir) > 0 {
+		volMapSharedDir := fmt.Sprintf("%s:/ocm-workspace/shared", config.SharedDir)
+		commandArgs = append(commandArgs, "-v", volMapSharedDir)
 	}
 
 	// Allocate free port and map host port for OpenShift console

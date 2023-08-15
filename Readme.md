@@ -2,12 +2,12 @@
 A containerised workspace or environment for running OpenShift Dedicated (OSD) cluster management tools (e.g. ocm-cli, oc, etc).
 
 # Goal
-Provide a deployable and isolated (container-isolation only) environment for managing OSD clusters.
+Provide a deployable, extensible and isolated (container-isolation only) environment for managing OSD clusters.
 
 # Prerequisites
 1. Clone this repository.
 2. Installed podman, golang and make binaries.
-3. An exactly named configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
+3. A configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
 
 
 # Install
@@ -93,7 +93,7 @@ backplaneCLIVersion: "0.1.2"
 ```
 
 # Service Reference Configuration
-A service reference can be added in the configuration file to enable tool features relevant to a certain service. This feature is useful for accessing a service from the ocm-workspace's host (e.g. web console). Note that from the host's side, its port is only accessible through the loopback interface.
+A service reference can be added in the configuration file to enable tool features relevant to a certain service. This feature is useful for accessing a service (e.g. web console) from the ocm-workspace's host. Note that from the host's side, its port is only accessible through the loopback interface.
 
 For example the following will automatically forward the specified ports of service `nginx` to an ocm-workspace port that is also mapped to a host port.
 
@@ -115,6 +115,3 @@ services:
           name: nginx-alertmanager
         port: 9093
 ```
-
-
-[![build](https://github.com/pepedocs/ocm-workspace/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/pepedocs/ocm-workspace/actions/workflows/build.yml)
