@@ -121,6 +121,8 @@ func runOCMWorkspaceContainer(
 	}
 	// set the OCM_TOKEN environment
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", ocmToken)
+	// set the run environment
+	envVarIsInContainer := fmt.Sprintf("IS_IN_CONTAINER=%v", true)
 	// Paths to where these files are mounted in the workspace container
 	containerBackplaneConfigPath := "/backplane-config.json"
 	ocmWorkspaceConfigPath := "/.ocm-workspace.yaml"
@@ -154,6 +156,8 @@ func runOCMWorkspaceContainer(
 		envVarBackplaneConfig,
 		"-e",
 		envVarIsOCMLoginOnly,
+		"-e",
+		envVarIsInContainer,
 		"-v",
 		volMapBackplaneConfig,
 		"-v",

@@ -4,6 +4,7 @@ FROM ${BASE_IMAGE}
 
 ARG OCM_CLI_VERSION="0.1.60"
 ARG BACKPLANE_CLI_VERSION="0.1.2"
+ARG BUILD_SHA=
 
 RUN dnf update -y && \
     dnf install -y procps \
@@ -28,6 +29,8 @@ RUN dnf update -y && \
     tar -xvf openshift-client-linux.tar.gz && \
     mv $PWD/oc /usr/bin/oc && \
     mv $PWD/kubectl /usr/bin/kubectl
+
+ENV BUILD_SHA=${BUILD_SHA}
 
 RUN mkdir -p /ocm-workspace/shared
 WORKDIR /ocm-workspace

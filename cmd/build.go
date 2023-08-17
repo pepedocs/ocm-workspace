@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,6 +32,17 @@ var buildCmd = &cobra.Command{
 		buildArgOcmCLIVersion := fmt.Sprintf("OCM_CLI_VERSION=%s", viper.GetString("ocmCLIVersion"))
 		buildArgBackplaneCLIVersion := fmt.Sprintf("BACKPLANE_CLI_VERSION=%s", viper.GetString("backplaneCLIVersion"))
 
+		out, err := runCommandOutput(
+			"git",
+			"rev-parse",
+			"HEAD",
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		headSha := string(out)
+		buildArgBuildSha := fmt.Sprintf("BUILD_SHA=%s", headSha)
+
 		runCommandStreamOutput(
 			"podman",
 			"build",
@@ -42,6 +54,8 @@ var buildCmd = &cobra.Command{
 			buildArgOcmCLIVersion,
 			"--build-arg",
 			buildArgBackplaneCLIVersion,
+			"--build-arg",
+			buildArgBuildSha,
 			".",
 		)
 	},
