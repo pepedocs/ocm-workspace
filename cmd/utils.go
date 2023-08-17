@@ -91,8 +91,8 @@ func ocGetConfig(runAsOcUser string) (*ocConfig, error) {
 
 // Gets the current OpenShift cluster that a user is logged in.
 func ocGetCurrentOcmCluster(runAsOcUser string) (string, error) {
-	ocmEnvironment := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
-	return ocmEnvironment, nil
+	ocmCluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
+	return ocmCluster, nil
 }
 
 // Gets the current OpenShift namespace.

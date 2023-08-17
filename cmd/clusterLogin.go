@@ -187,6 +187,7 @@ func configureDirs() {
 			fmt.Sprintf("%s/.config/ocm", userHome),
 		},
 		{
+			"sudo",
 			"chown",
 			"-R",
 			fmt.Sprintf("%s:%s", ocUser, ocUser),
