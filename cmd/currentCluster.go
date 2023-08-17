@@ -21,20 +21,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	currentClusterCmdArgs struct {
-		ocUser string
-	}
-)
-
 // currentClusterCmd represents the currentCluster command
 var currentClusterCmd = &cobra.Command{
 	Use:   "currentCluster",
 	Short: "Shows the current cluster where a user is logged in.",
 	Run: func(cmd *cobra.Command, args []string) {
-		cluster, err := ocGetCurrentOcmCluster(currentClusterCmdArgs.ocUser)
+		if !checkContainerCommand() {
+			return
+		}
+		cluster, err := ocGetCurrentOcmCluster()
 		if err != nil {
-			fmt.Print("na")
+			fmt.Print("unknown")
 		}
 		fmt.Print(cluster)
 	},
@@ -42,13 +39,4 @@ var currentClusterCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(currentClusterCmd)
-
-	currentClusterCmd.Flags().StringVarP(
-		&currentClusterCmdArgs.ocUser,
-		"ocUser",
-		"u",
-		"",
-		"Run as OpenShift user.",
-	)
-	currentClusterCmd.MarkFlagRequired("ocUser")
 }

@@ -90,7 +90,7 @@ func ocGetConfig(runAsOcUser string) (*ocConfig, error) {
 }
 
 // Gets the current OpenShift cluster that a user is logged in.
-func ocGetCurrentOcmCluster(runAsOcUser string) (string, error) {
+func ocGetCurrentOcmCluster() (string, error) {
 	ocmCluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
 	return ocmCluster, nil
 }
@@ -237,4 +237,16 @@ func runCommandStreamOutput(cmdName string, args ...string) gocmd.Status {
 	// Wait for goroutine to print everything
 	<-doneChan
 	return command.Status()
+}
+
+func isInContainer() bool {
+	return os.Getenv("IS_IN_CONTAINER") == "true"
+}
+
+func checkContainerCommand() bool {
+	if !isInContainer() {
+		log.Print("This command is intended to be run inside the workspace container only.")
+		return false
+	}
+	return true
 }

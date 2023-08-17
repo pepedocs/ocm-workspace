@@ -27,6 +27,9 @@ var buildInfoCmd = &cobra.Command{
 	Use:   "buildInfo",
 	Short: "Prints the current ocm-workspace image build information.",
 	Run: func(cmd *cobra.Command, args []string) {
+		if !checkContainerCommand() {
+			return
+		}
 		fmt.Printf("Build SHA: %s\n", os.Getenv("BUILD_SHA"))
 	},
 }

@@ -4,7 +4,6 @@ FROM ${BASE_IMAGE}
 
 ARG OCM_CLI_VERSION="0.1.60"
 ARG BACKPLANE_CLI_VERSION="0.1.2"
-ARG BUILD_SHA=
 
 RUN dnf update -y && \
     dnf install -y procps \
@@ -18,7 +17,6 @@ RUN dnf update -y && \
     htop && \
     yum install -y net-tools \
     make && \
-    pip install jinja2 && \
     curl -Lo /usr/bin/ocm https://github.com/openshift-online/ocm-cli/releases/download/v${OCM_CLI_VERSION}/ocm-linux-amd64 && \
     chmod +x /usr/bin/ocm && \
     wget https://github.com/openshift/backplane-cli/releases/download/v${BACKPLANE_CLI_VERSION}/ocm-backplane_${BACKPLANE_CLI_VERSION}_Linux_x86_64.tar.gz && \
@@ -30,6 +28,11 @@ RUN dnf update -y && \
     mv $PWD/oc /usr/bin/oc && \
     mv $PWD/kubectl /usr/bin/kubectl
 
+# User python packages
+RUN pip install aiohttp \
+                kubernetes
+
+ARG BUILD_SHA=
 ENV BUILD_SHA=${BUILD_SHA}
 
 RUN mkdir -p /ocm-workspace/shared
