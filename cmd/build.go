@@ -29,7 +29,6 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		buildArgBaseImage := fmt.Sprintf("BASE_IMAGE=%s", viper.GetString("baseImage"))
 		buildArgOcmCLIVersion := fmt.Sprintf("OCM_CLI_VERSION=%s", viper.GetString("ocmCLIVersion"))
-		buildArgRhocCLIVersion := fmt.Sprintf("RHOC_CLI_VERSION=%s", viper.GetString("rhocCLIVersion"))
 		buildArgBackplaneCLIVersion := fmt.Sprintf("BACKPLANE_CLI_VERSION=%s", viper.GetString("backplaneCLIVersion"))
 
 		runCommandStreamOutput(
@@ -41,8 +40,6 @@ var buildCmd = &cobra.Command{
 			buildArgBaseImage,
 			"--build-arg",
 			buildArgOcmCLIVersion,
-			"--build-arg",
-			buildArgRhocCLIVersion,
 			"--build-arg",
 			buildArgBackplaneCLIVersion,
 			".",
