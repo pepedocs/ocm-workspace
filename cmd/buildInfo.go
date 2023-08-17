@@ -17,26 +17,23 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
 
-// currentClusterCmd represents the currentCluster command
-var currentClusterCmd = &cobra.Command{
-	Use:   "currentCluster",
-	Short: "Shows the current cluster where a user is logged in.",
+// buildInfoCmd represents the buildInfo command
+var buildInfoCmd = &cobra.Command{
+	Use:   "buildInfo",
+	Short: "Prints the current ocm-workspace image build information.",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !checkContainerCommand() {
 			return
 		}
-		cluster, err := ocGetCurrentOcmCluster()
-		if err != nil {
-			fmt.Print("unknown")
-		}
-		fmt.Print(cluster)
+		fmt.Printf("Build SHA: %s\n", os.Getenv("BUILD_SHA"))
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(currentClusterCmd)
+	rootCmd.AddCommand(buildInfoCmd)
 }

@@ -63,9 +63,16 @@ type serviceRefConfig struct {
 	ForwardPorts []serviceRefForwardPort `mapstructure:"forwardPorts"`
 }
 
+type dirMap struct {
+	Path         string `mapstructure:"path"`
+	AddPathToEnv bool   `mapstructure:"addPathToEnv"`
+}
+
 type ocmWorkspaceConfig struct {
-	Services  []serviceRefConfig `mapstructure:"services"`
-	SharedDir string             `mapstructure:"sharedDir"`
+	Services      []serviceRefConfig `mapstructure:"services"`
+	CustomDirMaps []string           `mapstructure:"customDirMaps"`
+	AddToPATHEnv  []string           `mapstructure:"addToPATHEnv"`
+	ExportEnvVars []string           `mapstructure:"exportEnvVars"`
 }
 
 var (
@@ -121,6 +128,8 @@ func runOCMWorkspaceContainer(
 	}
 	// set the OCM_TOKEN environment
 	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", ocmToken)
+	// set the run environment
+	envVarIsInContainer := fmt.Sprintf("IS_IN_CONTAINER=%v", true)
 	// Paths to where these files are mounted in the workspace container
 	containerBackplaneConfigPath := "/backplane-config.json"
 	ocmWorkspaceConfigPath := "/.ocm-workspace.yaml"
@@ -154,6 +163,8 @@ func runOCMWorkspaceContainer(
 		envVarBackplaneConfig,
 		"-e",
 		envVarIsOCMLoginOnly,
+		"-e",
+		envVarIsInContainer,
 		"-v",
 		volMapBackplaneConfig,
 		"-v",
@@ -162,10 +173,30 @@ func runOCMWorkspaceContainer(
 		volMapOcmWorkspaceConfig,
 	}
 
-	if len(config.SharedDir) > 0 {
-		volMapSharedDir := fmt.Sprintf("%s:/ocm-workspace/shared", config.SharedDir)
-		commandArgs = append(commandArgs, "-v", volMapSharedDir)
+	fmt.Println(fmt.Sprintf("config: %v", config))
+	for _, dir := range config.CustomDirMaps {
+		commandArgs = append(commandArgs, "-v", dir)
 	}
+
+	envVarAddToPathEnv := "ADD_TO_PATH="
+	for idx, path := range config.AddToPATHEnv {
+		if idx < len(config.AddToPATHEnv)-1 {
+			envVarAddToPathEnv = envVarAddToPathEnv + path + ","
+		} else {
+			envVarAddToPathEnv = envVarAddToPathEnv + path
+		}
+	}
+	commandArgs = append(commandArgs, "-e", envVarAddToPathEnv)
+
+	envVarExportEnvVars := "EXPORT_ENV_VARS="
+	for idx, envvar := range config.ExportEnvVars {
+		if idx < len(config.ExportEnvVars)-1 {
+			envVarExportEnvVars = envVarExportEnvVars + envvar + ","
+		} else {
+			envVarExportEnvVars = envVarExportEnvVars + envvar
+		}
+	}
+	commandArgs = append(commandArgs, "-e", envVarExportEnvVars)
 
 	// Allocate free port and map host port for OpenShift console
 	ports, err := getFreePorts(1)

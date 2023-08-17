@@ -31,6 +31,9 @@ var currentNamespaceCmd = &cobra.Command{
 	Use:   "currentNamespace",
 	Short: "Shows OpenShift's current context namespace given an OpenShift user.",
 	Run: func(cmd *cobra.Command, args []string) {
+		if !checkContainerCommand() {
+			return
+		}
 		namespace, err := ocGetCurrentNamespace(currentNamespaceCmdArgs.ocUser)
 		if err != nil {
 			fmt.Print("na")

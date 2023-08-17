@@ -47,12 +47,17 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
+		src := ""
+		if os.Getenv("IS_IN_CONTAINER") == "true" {
+			src = "/"
+		} else {
+			// Find home directory.
+			home, err := os.UserHomeDir()
+			src = home
+			cobra.CheckErr(err)
+		}
 		// Search config in home directory with name ".ocm-workspace" (without extension).
-		viper.AddConfigPath(home)
+		viper.AddConfigPath(src)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".ocm-workspace")
 	}

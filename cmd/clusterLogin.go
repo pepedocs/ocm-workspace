@@ -100,14 +100,30 @@ func initTerminal() {
 		defer file.Close()
 
 		ps1String := fmt.Sprintf(
-			"\nPS1='[%s $(/usr/bin/workspace --config /.ocm-workspace.yaml currentCluster -u %s) $(/usr/bin/workspace --config /.ocm-workspace.yaml currentNamespace -u %s)]$ '\n",
-			ocUser, ocUser, ocUser,
-		)
+			"\nPS1='[%s $(/usr/bin/workspace currentCluster) $(/usr/bin/workspace currentNamespace -u %s)]$ '\n", ocUser, ocUser)
 		_, err = file.WriteString(ps1String)
 		if err != nil {
 			log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
 		}
 
+		addToPathEnv := strings.Split(strings.TrimSpace(os.Getenv("ADD_TO_PATH")), ",")
+		exportStr := "\nexport PATH=$PATH"
+		for _, path := range addToPathEnv {
+			exportStr = exportStr + fmt.Sprintf(":%s", path)
+		}
+		_, err = file.WriteString(exportStr)
+		if err != nil {
+			log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
+		}
+
+		exportEnvVars := strings.Split(strings.TrimSpace(os.Getenv("EXPORT_ENV_VARS")), ",")
+		for _, path := range exportEnvVars {
+			exportStr = fmt.Sprintf("\nexport %s", path)
+			_, err = file.WriteString(exportStr)
+			if err != nil {
+				log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
+			}
+		}
 	}
 	err = runCommandWithOsFiles("sudo", os.Stdout, os.Stderr, os.Stdin, "-Eu", ocUser, "bash")
 	if err != nil {
@@ -187,10 +203,9 @@ func configureDirs() {
 			fmt.Sprintf("%s/.config/ocm", userHome),
 		},
 		{
-			"chown",
-			"-R",
-			fmt.Sprintf("%s:%s", ocUser, ocUser),
-			"/ocm-workspace/shared",
+			"chmod",
+			"o+rwx",
+			"/ocm-workspace",
 		},
 	}
 	runCommandListStreamOutput(commands)
