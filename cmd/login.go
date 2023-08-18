@@ -173,7 +173,7 @@ func runOCMWorkspaceContainer(
 		volMapOcmWorkspaceConfig,
 	}
 
-	fmt.Println(fmt.Sprintf("config: %v", config))
+	//fmt.Println(fmt.Sprintf("config: %v", config))
 	for _, dir := range config.CustomDirMaps {
 		commandArgs = append(commandArgs, "-v", dir)
 	}
