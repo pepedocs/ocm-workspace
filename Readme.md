@@ -65,6 +65,7 @@ http://localhost:<value of OPENSHIFT_CONSOLE_PORT>
 1. `.ocm-workspace.yaml` in `/home/<user>/.ocm-workspace.yaml`
 2. `config.<prod|stage>.json` in `/home/<user>/.config/backplane`
 
+For more information see [config.md](./config.md).
 
 **Steps**
 1. Create the expected configuration file.
