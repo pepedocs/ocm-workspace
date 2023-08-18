@@ -31,6 +31,9 @@ var clusterLoginCmd = &cobra.Command{
 	Use:   "clusterLogin",
 	Short: "Logs in to an OpenShift Dedicated cluster.",
 	Run: func(cmd *cobra.Command, args []string) {
+		if !checkContainerCommand() {
+			return
+		}
 		isOcmLoginOnly, err := strconv.ParseBool(os.Getenv("IS_OCM_LOGIN_ONLY"))
 		if err != nil {
 			log.Println("Failed to parse environment variable: ", err)
