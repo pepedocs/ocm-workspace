@@ -1,8 +1,10 @@
 # ocm-workspace
-A containerised workspace or environment for running OpenShift Dedicated (OSD) cluster management tools (e.g. ocm-cli, oc, etc).
+A containerised workspace for running OpenShift Dedicated (OSD) cluster management tools (e.g. ocm-cli, oc, etc).
 
 # Goal
-Provide a deployable, extensible and isolated (container-isolation only) environment for managing OSD clusters.
+Provide a deployable, extensible and isolated (container-isolation only) workspace for managing OSD clusters.
+
+> **Important:** ocm-workspace is a user container workspace which is intended to be customized by the user only and not a means to control "how to do" things.
 
 # Prerequisites
 1. Clone this repository.
@@ -10,20 +12,12 @@ Provide a deployable, extensible and isolated (container-isolation only) environ
 3. A configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
 
 
-# Install
+# Build, Install, and Build the Workspace Image
 To install the ocm-workspace binary in your $GOPATH, run the following.
 
 ```
 $ cd ocm-workspace
-$ make install
-```
-
-# Build ocm-workspace image
-To build the ocm-workspace image, run the following.
-
-```
-$ cd ocm-workspace
-$ make buildImage
+$ make all
 ```
 
 # Log into an OSD cluster
@@ -66,7 +60,7 @@ http://localhost:<value of OPENSHIFT_CONSOLE_PORT>
 ```
 
 
-# Configuration
+# Mimimum Required Configuration
 **Prerequisites**
 1. `.ocm-workspace.yaml` in `/home/<user>/.ocm-workspace.yaml`
 2. `config.<prod|stage>.json` in `/home/<user>/.config/backplane`
