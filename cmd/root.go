@@ -22,8 +22,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/spf13/viper"
+
+	pkgInt "ocm-workspace/internal"
 )
 
+var config *pkgInt.OcmWorkspaceConfig
 var cfgFile string
 
 var rootCmd = &cobra.Command{
@@ -37,26 +40,23 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ocm-workspace.yaml)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
-		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		src := ""
+		var src string
 		if os.Getenv("IS_IN_CONTAINER") == "true" {
 			src = "/"
 		} else {
-			// Find home directory.
 			home, err := os.UserHomeDir()
 			src = home
 			cobra.CheckErr(err)
 		}
-		// Search config in home directory with name ".ocm-workspace" (without extension).
 		viper.AddConfigPath(src)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".ocm-workspace")
@@ -69,4 +69,6 @@ func initConfig() {
 	if err != nil {
 		glog.Fatal("Failed to read config file: ", err)
 	}
+
+	config = pkgInt.NewOcmWorkspaceConfig()
 }

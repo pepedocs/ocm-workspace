@@ -21,59 +21,13 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/golang/glog"
 	"github.com/google/uuid"
+	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
+
+	pkgInt "ocm-workspace/internal"
+	pkgIntHelper "ocm-workspace/internal/helpers"
 )
-
-// Represents a port bind between a k8s service, a container (forwarded port) and a container's host
-type serviceHostPortBind struct {
-	HostPort      int    `yaml:"hostPort"`
-	ServicePort   int    `yaml:"servicePort"`
-	ServiceName   string `yaml:"serviceName"`
-	ParentService string `yaml:"parentService"`
-	SourceKind    string `yaml:"sourceKind"`
-	SourceName    string `yaml:"sourceName"`
-	Namespace     string `yaml:"namespace"`
-}
-
-type serviceHostPortBindList struct {
-	ServiceHostPortBinds []serviceHostPortBind `yaml:"serviceHostPortBinds"`
-}
-
-// Represents a k8s service's port forward source (e.g. pod or deployment)
-type serviceRefForwardPortSource struct {
-	Kind string `mapstructure:"kind"`
-	Name string `mapstructure:"name"`
-}
-
-// Represents a k8s service port forward parameters
-type serviceRefForwardPort struct {
-	Name      string                      `mapstructure:"name"`
-	Namespace string                      `mapstructure:"namespace"`
-	Source    serviceRefForwardPortSource `mapstructure:"source"`
-	Port      int                         `mapstructure:"port"`
-}
-
-// Represents a parent service's list of child services that need port forwards
-type serviceRefConfig struct {
-	Name         string                  `mapstructure:"name"`
-	ForwardPorts []serviceRefForwardPort `mapstructure:"forwardPorts"`
-}
-
-type dirMap struct {
-	Path         string `mapstructure:"path"`
-	AddPathToEnv bool   `mapstructure:"addPathToEnv"`
-}
-
-type ocmWorkspaceConfig struct {
-	Services      []serviceRefConfig `mapstructure:"services"`
-	CustomDirMaps []string           `mapstructure:"customDirMaps"`
-	AddToPATHEnv  []string           `mapstructure:"addToPATHEnv"`
-	ExportEnvVars []string           `mapstructure:"exportEnvVars"`
-}
 
 var (
 	loginCmdArgs struct {
@@ -85,176 +39,120 @@ var (
 )
 
 var loginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Runs the ocm workspace container and logs in to a cluster.",
-	Long: `Runs the ocm workspace container with the ocm workspace as its entrypoint.
-           The entrypoint is supplied with the "clusterLogin" flag to proceed with
-		   logging into a cluster.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		ocmEnvironment := "production"
-		serviceRef := loginCmdArgs.service
-		if len(loginCmdArgs.ocmEnvironment) > 0 {
-			ocmEnvironment = loginCmdArgs.ocmEnvironment
-		}
-		runOCMWorkspaceContainer(
-			loginCmdArgs.cluster,
-			ocmEnvironment,
-			serviceRef,
-			loginCmdArgs.isOcmLoginOnly)
-	},
+	Use:    "login",
+	Short:  "Launches the ocm-workspace container and logs into a cluster.",
+	PreRun: toggleDebug,
+	Run:    onLogin,
 }
 
 // Runs the OCM Workspace container using the image built by the "build" command
-func runOCMWorkspaceContainer(
-	ocmCluster string,
-	ocmEnvironment string,
-	serviceRef string,
-	isOcmLoginOnly bool) {
-	envVarOcmUser := fmt.Sprintf("OCM_USER=%s", viper.GetString("ocUser"))
-	envVarCluster := fmt.Sprintf("OCM_CLUSTER=%s", ocmCluster)
-	envVarIsOCMLoginOnly := fmt.Sprintf("IS_OCM_LOGIN_ONLY=%v", isOcmLoginOnly)
-	userHome := viper.GetString("userHome")
+func onLogin(cmd *cobra.Command, args []string) {
+	ocmEnvironment := "production"
 
-	var config ocmWorkspaceConfig
-	err := viper.Unmarshal(&config)
-	if err != nil {
-		log.Fatal("Failed to unmarshal config: ", err)
+	if len(loginCmdArgs.ocmEnvironment) > 0 {
+		ocmEnvironment = loginCmdArgs.ocmEnvironment
 	}
 
-	// Fetch the latest OCM_TOKEN
-	ocmToken, err := ocmGetOCMToken()
+	ceFactory := pkgInt.NewCeFactory(map[string]interface{}{
+		"ceName": "podman",
+	})
+
+	ocmCluster := loginCmdArgs.cluster
+	isOcmLoginOnly := loginCmdArgs.isOcmLoginOnly
+
+	ce, err := ceFactory.Create()
 	if err != nil {
-		log.Fatal("Failed to fetch the token: ", err)
+		logger.Fatal("Failed to create container engine: ", err)
 	}
-	// set the OCM_TOKEN environment
-	envVarOcmToken := fmt.Sprintf("OCM_TOKEN=%s", ocmToken)
-	// set the run environment
-	envVarIsInContainer := fmt.Sprintf("IS_IN_CONTAINER=%v", true)
-	// Paths to where these files are mounted in the workspace container
+
+	ocmLongLivedTokenPath := config.GetOcmLongLivedTokenPath()
+	var ocmToken string
+
+	if len(ocmLongLivedTokenPath) > 0 {
+		content, err := os.ReadFile(ocmLongLivedTokenPath)
+		if err != nil {
+			logger.Fatalf("Failed to open long lived token file: %v", content)
+		}
+		ocmToken = string(content)
+	} else {
+		ocmToken, err = pkgIntHelper.OcmGetOCMToken()
+		if err != nil {
+			logger.Fatal("Failed to fetch the OCM token: ", err)
+		}
+	}
+
+	// Path where backplane config is mounted in the container
 	containerBackplaneConfigPath := "/backplane-config.json"
+	// Path where workspace config is mounted in the container
 	ocmWorkspaceConfigPath := "/.ocm-workspace.yaml"
 
-	volMapBackplaneConfig := fmt.Sprintf("%s/.config/backplane/%s:%s:ro", userHome, viper.GetString("backplaneConfigProd"), containerBackplaneConfigPath)
-	if ocmEnvironment == "staging" {
-		volMapBackplaneConfig = fmt.Sprintf("%s/.config/backplane/%s:%s:ro", userHome, viper.GetString("backplaneConfigStage"), containerBackplaneConfigPath)
+	// Allocate free port and map host port for OpenShift console
+	ports, err := pkgIntHelper.GetFreePorts(1)
+	if err != nil {
+		logger.Fatal("Failed to generate port for Openshift console: ", err)
+	}
+	openshiftConsolePort := strconv.Itoa(ports[0])
+
+	// Gather values for the container's environment variables
+	ce.AppendEnvVar("HOST_USER", config.GetHostUser())
+	ce.AppendEnvVar("OC_USER", config.GetOcUser())
+	ce.AppendEnvVar("OCM_CLUSTER", ocmCluster)
+	ce.AppendEnvVar("IS_OCM_LOGIN_ONLY", strconv.FormatBool(isOcmLoginOnly))
+	ce.AppendEnvVar("OCM_TOKEN", ocmToken)
+	ce.AppendEnvVar("IS_IN_CONTAINER", "true")
+	ce.AppendEnvVar("OCM_ENVIRONMENT", ocmEnvironment)
+	ce.AppendEnvVar("BACKPLANE_CONFIG", containerBackplaneConfigPath)
+	ce.AppendEnvVar("OPENSHIFT_CONSOLE_PORT", openshiftConsolePort)
+	ce.AppendEnvVar("PLUGIN_SERVICE", loginCmdArgs.service)
+
+	// Gather values for the container's host-mounted volumes
+	if ocmEnvironment == "production" {
+		ce.AppendVolMap(
+			fmt.Sprintf("%s/.config/backplane/%s", config.GetUserHome(), config.GetBackplaneConfigProd()),
+			containerBackplaneConfigPath,
+			"ro",
+		)
+	} else {
+		ce.AppendVolMap(
+			fmt.Sprintf("%s/.config/backplane/%s", config.GetUserHome(), config.GetBackplaneConfigStage()),
+			containerBackplaneConfigPath,
+			"ro",
+		)
+	}
+	ce.AppendVolMap("./terminal", "/terminal", "ro")
+	ce.AppendVolMap(fmt.Sprintf("%s/.ocm-workspace.yaml", config.GetUserHome()), ocmWorkspaceConfigPath, "ro")
+
+	for _, dirMap := range config.GetCustomDirMaps() {
+		ce.AppendVolMap(dirMap.HostDir, dirMap.ContainerDir, dirMap.FileAttrs)
 	}
 
-	volMapTerminalDir := "./terminal:/terminal:ro"
-	volMapOcmWorkspaceConfig := fmt.Sprintf("%s/.ocm-workspace.yaml:%s:ro", userHome, ocmWorkspaceConfigPath)
-	envVarOcmEnvironment := fmt.Sprintf("OCM_ENVIRONMENT=%s", ocmEnvironment)
-	envVarBackplaneConfig := fmt.Sprintf("BACKPLANE_CONFIG=%s", containerBackplaneConfigPath)
+	// Mount plugin executables
+	plugins := config.GetPlugins()
+	for _, plug := range plugins {
+		ce.AppendVolMap(plug.ExecPath, fmt.Sprintf("/%s", plug.Name), "ro")
+	}
+
+	// Gather values for the containers host-mapped TCP ports
+	// Openshift console port
+	ce.AppendPortMap(openshiftConsolePort, openshiftConsolePort, "127.0.0.1")
+
+	var customPortMaps string
+	for _, pm := range config.CustomPortMaps {
+		ports, err = pkgIntHelper.GetFreePorts(1)
+		if err != nil {
+			logger.Fatalf("Failed to allocate host ports: %v", err)
+		}
+		pm.HostPort = strconv.Itoa(ports[0])
+		customPortMaps += fmt.Sprintf("%s:%s,", pm.HostPort, pm.ContainerPort)
+		ce.AppendPortMap(pm.HostPort, pm.ContainerPort, "127.0.0.1")
+	}
+	ce.AppendEnvVar("CUSTOM_PORT_MAPS", customPortMaps)
+
 	suffix := uuid.New()
 	containerName := fmt.Sprintf("ow-%s-%s", ocmCluster, suffix.String()[:6])
-	commandArgs := []string{
-		"run",
-		"--name",
+
+	runCmd := ce.GetRunArgs(
 		containerName,
-		"-it",
-		"--privileged",
-		"-e",
-		envVarOcmUser,
-		"-e",
-		envVarOcmEnvironment,
-		"-e",
-		envVarOcmToken,
-		"-e",
-		envVarCluster,
-		"-e",
-		envVarBackplaneConfig,
-		"-e",
-		envVarIsOCMLoginOnly,
-		"-e",
-		envVarIsInContainer,
-		"-v",
-		volMapBackplaneConfig,
-		"-v",
-		volMapTerminalDir,
-		"-v",
-		volMapOcmWorkspaceConfig,
-	}
-
-	//fmt.Println(fmt.Sprintf("config: %v", config))
-	for _, dir := range config.CustomDirMaps {
-		commandArgs = append(commandArgs, "-v", dir)
-	}
-
-	envVarAddToPathEnv := "ADD_TO_PATH="
-	for idx, path := range config.AddToPATHEnv {
-		if idx < len(config.AddToPATHEnv)-1 {
-			envVarAddToPathEnv = envVarAddToPathEnv + path + ","
-		} else {
-			envVarAddToPathEnv = envVarAddToPathEnv + path
-		}
-	}
-	commandArgs = append(commandArgs, "-e", envVarAddToPathEnv)
-
-	envVarExportEnvVars := "EXPORT_ENV_VARS="
-	for idx, envvar := range config.ExportEnvVars {
-		if idx < len(config.ExportEnvVars)-1 {
-			envVarExportEnvVars = envVarExportEnvVars + envvar + ","
-		} else {
-			envVarExportEnvVars = envVarExportEnvVars + envvar
-		}
-	}
-	commandArgs = append(commandArgs, "-e", envVarExportEnvVars)
-
-	// Allocate free port and map host port for OpenShift console
-	ports, err := getFreePorts(1)
-	if err != nil {
-		glog.Fatal("Failed to generate port for Openshift console: ", err)
-	}
-
-	portStr := strconv.Itoa(ports[0])
-	envVarOpenShiftConsolePort := fmt.Sprintf("OPENSHIFT_CONSOLE_PORT=%s", portStr)
-	commandArgs = append(commandArgs, "-e")
-	commandArgs = append(commandArgs, envVarOpenShiftConsolePort)
-	openShiftConsolePortMap := fmt.Sprintf("127.0.0.1:%s:%s", portStr, portStr)
-	commandArgs = append(commandArgs, "-p")
-	commandArgs = append(commandArgs, openShiftConsolePortMap)
-
-	var portBindList serviceHostPortBindList
-
-	// Bind service ports to free host ports
-	for _, svcRefConf := range config.Services {
-		if svcRefConf.Name != serviceRef {
-			continue
-		}
-		for _, forwardPort := range svcRefConf.ForwardPorts {
-			ports, err := getFreePorts(1)
-			if err != nil {
-				log.Fatalf("Failed to generate port for %s: %s", svcRefConf.Name, err)
-			}
-			// Host port must only be locally accessible
-			portMap := fmt.Sprintf("127.0.0.1:%s:%s", strconv.Itoa(ports[0]), strconv.Itoa(ports[0]))
-			commandArgs = append(commandArgs, "-p")
-			commandArgs = append(commandArgs, portMap)
-
-			var svcHostPort serviceHostPortBind
-			svcHostPort.HostPort = ports[0]
-			svcHostPort.ServiceName = forwardPort.Name
-			svcHostPort.ServicePort = forwardPort.Port
-			svcHostPort.ParentService = svcRefConf.Name
-			svcHostPort.SourceKind = forwardPort.Source.Kind
-			svcHostPort.SourceName = forwardPort.Source.Name
-			svcHostPort.Namespace = forwardPort.Namespace
-			portBindList.ServiceHostPortBinds = append(
-				portBindList.ServiceHostPortBinds,
-				svcHostPort,
-			)
-		}
-	}
-
-	// Store the service and host port binds into an environment variable
-	portBindListYamlStr, err := yaml.Marshal(portBindList)
-	if err != nil {
-		log.Printf("Failed to marshal port bind list string %s: %s", portBindListYamlStr, err)
-	}
-	envVarPortBindListYamlStr := fmt.Sprintf("HOST_PORT_MAPS=\"%s\"", portBindListYamlStr)
-	commandArgs = append(
-		commandArgs,
-		"-e",
-		envVarPortBindListYamlStr,
-		"--entrypoint",
 		"./workspace",
 		"ocm-workspace:latest",
 		"clusterLogin",
@@ -262,7 +160,21 @@ func runOCMWorkspaceContainer(
 		"--config",
 		ocmWorkspaceConfigPath,
 	)
-	err = runCommandWithOsFiles("podman", os.Stdout, os.Stderr, os.Stdin, commandArgs...)
+
+	if debug {
+		runCmd = append(runCmd, "-d")
+	}
+
+	logger.Debugf("Container run command: %v", runCmd)
+
+	err = pkgIntHelper.RunCommandWithOsFiles(
+		ce.GetExecName(),
+		os.Stdout,
+		os.Stderr,
+		os.Stdin,
+		runCmd...,
+	)
+
 	if err != nil {
 		log.Fatal("Failed to run command: ", err)
 	}

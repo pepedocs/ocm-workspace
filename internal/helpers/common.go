@@ -13,26 +13,30 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+
+package internal
 
 import (
-	logger "github.com/sirupsen/logrus"
-
-	"github.com/spf13/cobra"
+	"net"
 )
 
-// buildInfoCmd represents the buildInfo command
-var buildInfoCmd = &cobra.Command{
-	Use:   "buildInfo",
-	Short: "Prints the current ocm-workspace image build information.",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := checkContainerCommand(); err != nil {
-			return
-		}
-		logger.Infof("Build SHA: %s\n", getEnvVar("BUILD_SHA"))
-	},
-}
+// Gets free/unused network ports
+func GetFreePorts(numPorts int) ([]int, error) {
+	var ports []int
 
-func init() {
-	rootCmd.AddCommand(buildInfoCmd)
+	for idx := 0; idx < numPorts; idx++ {
+		addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+		if err != nil {
+			return ports, err
+		}
+		listener, err := net.ListenTCP("tcp", addr)
+		if err != nil {
+			return ports, err
+		}
+
+		defer listener.Close()
+		ports = append(ports, listener.Addr().(*net.TCPAddr).Port)
+	}
+	return ports, nil
+
 }

@@ -17,193 +17,212 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
+	pkgInt "ocm-workspace/internal"
+	pkgIntHelper "ocm-workspace/internal/helpers"
+
+	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
+var ocmWorkspace *ocmWorkspaceContainer
+
 var clusterLoginCmd = &cobra.Command{
-	Use:   "clusterLogin",
-	Short: "Logs in to an OpenShift Dedicated cluster.",
-	Run: func(cmd *cobra.Command, args []string) {
-		if !checkContainerCommand() {
-			return
-		}
-		isOcmLoginOnly, err := strconv.ParseBool(os.Getenv("IS_OCM_LOGIN_ONLY"))
-		if err != nil {
-			log.Println("Failed to parse environment variable: ", err)
-		}
-		configureOcmUser()
-		configureDirs()
-		ocmLogin()
-		if !isOcmLoginOnly {
-			ocmBackplaneLogin()
-			processOpenShiftServiceReference()
-			envVarOpenShiftConsolePort := strings.TrimSpace(os.Getenv("OPENSHIFT_CONSOLE_PORT"))
-			log.Println("OpenShift console port: ", envVarOpenShiftConsolePort)
-		}
-		initTerminal()
-	},
+	Use:    "clusterLogin",
+	Short:  "Logs in to an OpenShift Dedicated cluster.",
+	PreRun: toggleDebug,
+	Run:    onClusterLogin,
 }
 
-// Processes OpenShift service references described in the ocm workpsace config
-func processOpenShiftServiceReference() {
-	var svcHostPortBindList serviceHostPortBindList
-	envVar := strings.TrimSpace(os.Getenv("HOST_PORT_MAPS"))
-	envVar = strings.Trim(envVar, "\"")
-	err := yaml.Unmarshal([]byte(envVar), &svcHostPortBindList)
-	if err != nil {
-		log.Fatalf("Failed to unmarshal environment variable value HOST_PORT_MAPS %s: %s", envVar, err)
+func onClusterLogin(cmd *cobra.Command, args []string) {
+
+	// Use ocm workspace container instance for in-container commands
+	ocmWorkspace = NewOcmWorkspaceContainer(config)
+	if err := checkContainerCommand(); err != nil {
+		logger.Fatal(err)
 	}
 
-	if len(svcHostPortBindList.ServiceHostPortBinds) == 0 {
-		log.Println("No service/host ports to bind.")
+	configureOCMUser()
+	configureWorkspaceDirs()
+	OCMLogin()
+	OCMBackplaneLogin()
+
+	customPortMapsStr := strings.Trim(getEnvVar("CUSTOM_PORT_MAPS"), ",")
+	var allocatedContainerPorts []string
+
+	for _, pm := range strings.Split(customPortMapsStr, ",") {
+		ports := strings.Split(pm, ":")
+		allocatedContainerPorts = append(allocatedContainerPorts, ports[1])
 	}
 
-	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	for _, portBind := range svcHostPortBindList.ServiceHostPortBinds {
-		params := []string{
-			"-Eu",
-			ocUser,
-			"oc",
-			"port-forward",
-			portBind.SourceName,
-			"--address",
-			"0.0.0.0",
-			fmt.Sprintf("%s:%s", strconv.Itoa(portBind.HostPort), strconv.Itoa(portBind.ServicePort)),
-			"-n",
-			portBind.Namespace,
+	plugins := config.GetPlugins()
+	for _, plug := range plugins {
+
+		if plug.RunOn == "ocmBackplaneLoginSuccess" {
+			err := OCMBackplaneLoginSuccess(plug, allocatedContainerPorts)
+			if err != nil {
+				logger.Fatalf("Plugin %v failed to run: %v", plug.Name, err)
+			}
 		}
-		log.Printf("Forwarding %s/%s port to %s", portBind.ParentService, portBind.ServiceName, strconv.Itoa(portBind.HostPort))
 
-		err := runCommandBackground("sudo", params...)
-		//err := runCommand("sudo", params...)
-		if err != nil {
-			log.Printf("Failed to port forward %s: %s\n", strconv.Itoa(portBind.ServicePort), err)
+		if (len(allocatedContainerPorts) - plug.AllocatePorts) > 1 {
+			allocatedContainerPorts = allocatedContainerPorts[plug.AllocatePorts+1:]
 		}
 	}
+
+	runTerminal()
 }
 
-// Initializes a bash terminal for ocm workspace
-func initTerminal() {
-	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	userHome := viper.GetString("userHome")
-	userBashrcPath := fmt.Sprintf("%s/.bashrc", userHome)
-	runCommandStreamOutput("cp", "/terminal/bashrc", userBashrcPath)
+func runTerminal() {
+	// Run terminal
+	status := pkgIntHelper.RunCommandStreamOutput("cp", "/terminal/bashrc", ocmWorkspace.UserBashrcPath)
+	if status.Exit != 0 {
+		logger.Fatalf("Failed to copy /terminal/bashrc: %v", status.Error)
+	}
 
-	file, err := os.OpenFile(userBashrcPath, os.O_APPEND|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(ocmWorkspace.UserBashrcPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Printf("Failed to open %s: %s\n", userBashrcPath, err)
+		logger.Errorf("Failed to open %s: %s\n", ocmWorkspace.UserBashrcPath, err)
 	} else {
 		defer file.Close()
 
 		ps1String := fmt.Sprintf(
-			"\nPS1='[%s $(/usr/bin/workspace currentCluster) $(/usr/bin/workspace currentNamespace -u %s)]$ '\n", ocUser, ocUser)
+			"\nPS1='[%s %s $(/usr/bin/workspace currentCluster) $(/usr/bin/workspace currentNamespace -u %s)]$ '\n",
+			ocmWorkspace.HostUser,
+			ocmWorkspace.OcmEnvironment,
+			ocmWorkspace.HostUser)
 		_, err = file.WriteString(ps1String)
 		if err != nil {
-			log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
+			logger.Errorf("Failed to write to file %s: %s\n", ocmWorkspace.UserBashrcPath, err)
 		}
 
-		addToPathEnv := strings.Split(strings.TrimSpace(os.Getenv("ADD_TO_PATH")), ",")
 		exportStr := "\nexport PATH=$PATH"
-		for _, path := range addToPathEnv {
-			exportStr = exportStr + fmt.Sprintf(":%s", path)
+		for _, path := range config.GetAddToPATHEnv() {
+			exportStr += fmt.Sprintf(":%s", path)
 		}
 		_, err = file.WriteString(exportStr)
 		if err != nil {
-			log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
+			logger.Errorf("Failed to write to file %s: %s\n", ocmWorkspace.UserBashrcPath, err)
 		}
 
-		exportEnvVars := strings.Split(strings.TrimSpace(os.Getenv("EXPORT_ENV_VARS")), ",")
-		for _, path := range exportEnvVars {
+		for _, path := range config.GetExportEnvVars() {
 			exportStr = fmt.Sprintf("\nexport %s", path)
 			_, err = file.WriteString(exportStr)
 			if err != nil {
-				log.Printf("Failed to write to file %s: %s\n", userBashrcPath, err)
+				logger.Errorf("Failed to write to file %s: %s\n", ocmWorkspace.UserBashrcPath, err)
 			}
 		}
 	}
-	err = runCommandWithOsFiles("sudo", os.Stdout, os.Stderr, os.Stdin, "-Eu", ocUser, "bash")
+	err = pkgIntHelper.RunCommandWithOsFiles("sudo", os.Stdout, os.Stderr, os.Stdin, "-Eu", ocmWorkspace.HostUser, "bash")
 	if err != nil {
-		log.Fatal("Failed to run command: ", err)
+		logger.Fatal("Failed to run command: ", err)
 	}
 }
 
-// Logs in a user in to an OCM cluster
-func ocmBackplaneLogin() {
-	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	cluster := strings.TrimSpace(os.Getenv("OCM_CLUSTER"))
-	status := runCommandStreamOutput(
+func runPlugin(plug pkgInt.Plugin, configPath string, envVars [][]string) error {
+	cmdArgs := []string{
+		"-Eu",
+		getEnvVar("HOST_USER"),
+		fmt.Sprintf("/%s", plug.Name), plug.ExecCommand, "--config", configPath}
+	if debug {
+		cmdArgs = append(cmdArgs, "-d")
+	}
+	err := pkgIntHelper.RunCommandBackground("sudo", cmdArgs, envVars)
+	return err
+}
+
+func OCMBackplaneLoginSuccess(plug pkgInt.Plugin, allocatedContainerPorts []string) error {
+
+	// Create (overwrite) plugin config
+	configPath := fmt.Sprintf("%s/.%s.yaml", ocmWorkspace.UserHome, plug.Name)
+	createConfigFile(configPath, plug.Config)
+
+	if plug.AllocatePorts > len(allocatedContainerPorts) {
+		logger.Fatalf("Not enough custom port maps for plugin use.")
+	}
+
+	// Pass allocated container ports to plugin as environment variables
+	envVars := [][]string{
+		{"PLUGIN_SERVICE", getEnvVar("PLUGIN_SERVICE")},
+		{"HOST_USER", getEnvVar("HOST_USER")},
+	}
+
+	return runPlugin(plug, configPath, envVars)
+}
+
+func OCMBackplaneLogin() {
+	isOcmLoginOnly, err := strconv.ParseBool(ocmWorkspace.IsOcmLoginOnly)
+	if err != nil {
+		logger.Fatal("Failed to parse environment variable: ", err)
+	}
+
+	if !isOcmLoginOnly {
+		// Backplane login
+		status := pkgIntHelper.RunCommandStreamOutput(
+			"sudo",
+			"-Eu",
+			ocmWorkspace.HostUser,
+			"ocm",
+			"backplane",
+			"login",
+			ocmWorkspace.OcmCluster,
+		)
+
+		if status.Exit != 0 {
+			logger.Fatalf("OCM backplane login failed: %v", status.Error)
+		}
+		logger.Info("OCM backplane login successful.")
+	}
+
+}
+
+func OCMLogin() {
+	logger.Info("Logging into ocm ", ocmWorkspace.OcmEnvironment)
+
+	status := pkgIntHelper.RunCommandStreamOutput(
 		"sudo",
 		"-Eu",
-		ocUser,
+		ocmWorkspace.HostUser,
 		"ocm",
-		"backplane",
 		"login",
-		cluster,
+		fmt.Sprintf("--token=%s", ocmWorkspace.OcmToken),
+		fmt.Sprintf("--url=%s", ocmWorkspace.OcmEnvironment),
 	)
 
 	if status.Exit != 0 {
-		log.Fatal("OCM backplane login failed.")
+		logger.Fatalf("OCM Login failed: %v", status.Error)
 	}
-	log.Println("OCM backplane login successful.")
+
+	logger.Info("OCM Login successful.")
 }
 
-// Logs in a user in to OCM
-func ocmLogin() {
-	ocmToken := strings.TrimSpace(os.Getenv("OCM_TOKEN"))
-	ocmEnvironment := strings.TrimSpace(os.Getenv("OCM_ENVIRONMENT"))
-	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-
-	log.Println("Logging into ocm", ocmEnvironment)
-
-	status := runCommandStreamOutput(
-		"sudo",
-		"-Eu",
-		ocUser,
-		"ocm",
-		"login",
-		fmt.Sprintf("--token=%s", ocmToken),
-		fmt.Sprintf("--url=%s", ocmEnvironment),
-	)
-
-	if status.Exit != 0 {
-		log.Fatal("OCM Login failed")
-	}
-	log.Println("OCM Login successful.")
-}
-
-// Configures the required directories in the ocm workspace container
-func configureDirs() {
-	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	userHome := viper.GetString("userHome")
+func configureWorkspaceDirs() {
+	// Configure directories
 	commands := [][]string{
 		{
 			"mkdir",
 			"-p",
-			fmt.Sprintf("%s/.kube", userHome),
+			fmt.Sprintf("%s/.kube", ocmWorkspace.UserHome),
 		},
 		{
 			"chown",
 			"-R",
-			fmt.Sprintf("%s:%s", ocUser, ocUser),
-			fmt.Sprintf("%s/.kube", userHome),
+			fmt.Sprintf("%s:%s", ocmWorkspace.HostUser, ocmWorkspace.HostUser),
+			fmt.Sprintf("%s/.kube", ocmWorkspace.UserHome),
 		},
 		{
 			"mkdir",
 			"-p",
-			fmt.Sprintf("%s/.config/ocm", userHome),
+			fmt.Sprintf("%s/.config/ocm", ocmWorkspace.UserHome),
 		},
 		{
 			"chown",
 			"-R",
-			fmt.Sprintf("%s:%s", ocUser, ocUser),
-			fmt.Sprintf("%s/.config/ocm", userHome),
+			fmt.Sprintf("%s:%s", ocmWorkspace.HostUser, ocmWorkspace.HostUser),
+			fmt.Sprintf("%s/.config/ocm", ocmWorkspace.UserHome),
 		},
 		{
 			"chmod",
@@ -211,31 +230,41 @@ func configureDirs() {
 			"/ocm-workspace",
 		},
 	}
-	runCommandListStreamOutput(commands)
+	errors := pkgIntHelper.RunCommandListStreamOutput(commands)
+
+	if len(errors) > 0 {
+		logger.Fatalf("Encountered errors while configuring workspace directories: %v", errors)
+	}
+
 }
 
-// Configures the OCM user in the ocm workspace container
-func configureOcmUser() {
-	ocUser := strings.TrimSpace(os.Getenv("OCM_USER"))
-	userHome := viper.GetString("userHome")
+func configureOCMUser() {
+
+	// Configure ocm user
 	commands := [][]string{
 		{
 			"useradd",
 			"-m",
-			ocUser,
+			ocmWorkspace.HostUser,
 			"-d",
-			userHome,
+			ocmWorkspace.UserHome,
 		},
 		{
 			"usermod",
 			"-aG",
 			"wheel",
-			ocUser,
+			ocmWorkspace.HostUser,
 		},
 	}
-	runCommandListStreamOutput(commands)
+	errors := pkgIntHelper.RunCommandListStreamOutput(commands)
+
+	if len(errors) > 0 {
+		logger.Fatalf("Encountered errors while configuring OCM user: %v", errors)
+	}
+
 	line := []byte("\n%wheel         ALL = (ALL) NOPASSWD: ALL\n")
 	os.WriteFile("/etc/sudoer", line, 0644)
+
 }
 
 func init() {

@@ -13,26 +13,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
-import (
-	logger "github.com/sirupsen/logrus"
+// Ref: https://droctothorpe.github.io/posts/2020/07/leveled-logs-with-cobra-and-logrus/
 
+import (
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
-// buildInfoCmd represents the buildInfo command
-var buildInfoCmd = &cobra.Command{
-	Use:   "buildInfo",
-	Short: "Prints the current ocm-workspace image build information.",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := checkContainerCommand(); err != nil {
-			return
-		}
-		logger.Infof("Build SHA: %s\n", getEnvVar("BUILD_SHA"))
-	},
-}
+var debug bool
 
-func init() {
-	rootCmd.AddCommand(buildInfoCmd)
+func toggleDebug(cmd *cobra.Command, args []string) {
+	if debug {
+		log.SetLevel(log.DebugLevel)
+		log.SetFormatter(&log.TextFormatter{})
+	}
 }

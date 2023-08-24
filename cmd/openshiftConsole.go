@@ -18,12 +18,16 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
+	logger "github.com/sirupsen/logrus"
+
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	pkgIntHelper "ocm-workspace/internal/helpers"
 )
 
 type ocDeploymentContainer struct {
@@ -61,14 +65,14 @@ var openshiftConsoleCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ocUser := viper.GetString("ocUser")
 		userHome := viper.GetString("userHome")
-		out, err := runCommandPipeStdin("ocm", "post", "/api/accounts_mgmt/v1/access_token")
+		out, err := pkgIntHelper.RunCommandPipeStdin("ocm", "post", "/api/accounts_mgmt/v1/access_token")
 		if err != nil {
-			log.Fatal("Failed to run command: ", err)
+			logger.Fatal("Failed to run command: ", err)
 		}
 		path := fmt.Sprintf("%s/.kube/ocm-pull-secret/config.json", userHome)
 		file, err := os.OpenFile(path, os.O_WRONLY, 0644)
 		if err != nil {
-			log.Fatal("Failed to open file: ", err)
+			logger.Fatal("Failed to open file: ", err)
 		}
 		defer file.Close()
 		file.WriteString(string(out))
@@ -90,7 +94,7 @@ var openshiftConsoleCmd = &cobra.Command{
 			kubeConfigFileName,
 		}
 
-		out, err = runCommandOutput(
+		out, err = pkgIntHelper.RunCommandOutput(
 			"podman",
 			"exec",
 			"-it",
@@ -107,13 +111,13 @@ var openshiftConsoleCmd = &cobra.Command{
 			"json",
 		)
 		if err != nil {
-			log.Fatal("Failed to run command: ", err)
+			logger.Fatal("Failed to run command: ", err)
 		}
 		var openShiftConsoleDeploy ocDeployment
 		var consoleImage string
 		err = json.Unmarshal(out, &openShiftConsoleDeploy)
 		if err != nil {
-			log.Fatal("Failed to unmarshal: ", err)
+			logger.Fatal("Failed to unmarshal: ", err)
 		}
 		fmt.Println(openShiftConsoleDeploy)
 
@@ -124,7 +128,7 @@ var openshiftConsoleCmd = &cobra.Command{
 			}
 		}
 
-		out, err = runCommandOutput(
+		out, err = pkgIntHelper.RunCommandOutput(
 			"podman",
 			"exec",
 			"-it",
@@ -138,22 +142,22 @@ var openshiftConsoleCmd = &cobra.Command{
 			"json",
 		)
 		if err != nil {
-			log.Fatal("Failed to run command: ", err)
+			logger.Fatal("Failed to run command: ", err)
 		}
 
-		var config ocConfig
+		var config pkgIntHelper.OcConfig
 		err = json.Unmarshal(out, &config)
 		if err != nil {
-			log.Fatal("Failed to unmarshal: ", err)
+			logger.Fatal("Failed to unmarshal: ", err)
 		}
 
 		imagePullArgs := append(pullArgs, consoleImage)
-		_, err = runCommandOutput(
+		_, err = pkgIntHelper.RunCommandOutput(
 			"podman",
 			imagePullArgs...,
 		)
 		if err != nil {
-			log.Fatal("Failed to run command: ", err)
+			logger.Fatal("Failed to run command: ", err)
 		}
 		cluster := config.Clusters[0]
 		apiUrl := cluster.ClusterUrls.Server
@@ -162,7 +166,7 @@ var openshiftConsoleCmd = &cobra.Command{
 		alertManagerUrl = strings.TrimRight(alertManagerUrl, "/")
 		thanosUrl = strings.TrimRight(thanosUrl, "/")
 
-		out, err = runCommandOutput(
+		out, err = pkgIntHelper.RunCommandOutput(
 			"podman",
 			"exec",
 			"-it",
@@ -173,7 +177,7 @@ var openshiftConsoleCmd = &cobra.Command{
 			"token",
 		)
 		if err != nil {
-			log.Fatal("Failed to run command: ", err)
+			logger.Fatal("Failed to run command: ", err)
 		}
 		ocmToken := strings.TrimSpace(string(out))
 		baseAddress := fmt.Sprintf("http://127.0.0.1:%s", consoleCmdArgs.workspaceContainerPort)
@@ -210,7 +214,7 @@ var openshiftConsoleCmd = &cobra.Command{
 			"-v",
 			"5",
 		)
-		runCommandWithOsFiles("podman", os.Stdout, os.Stderr, os.Stdin, runArgs...)
+		pkgIntHelper.RunCommandWithOsFiles("podman", os.Stdout, os.Stderr, os.Stdin, runArgs...)
 	},
 }
 

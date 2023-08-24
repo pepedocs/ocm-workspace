@@ -16,11 +16,12 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-	"log"
+	pkgIntHelper "ocm-workspace/internal/helpers"
 
+	pkgInt "ocm-workspace/internal"
+
+	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var buildCmd = &cobra.Command{
@@ -28,36 +29,33 @@ var buildCmd = &cobra.Command{
 	Short: "Builds the OCM workspace image locally.",
 	Long:  `Builds the OCM workspace image locally and tags it with ocm-workspace:latest:`,
 	Run: func(cmd *cobra.Command, args []string) {
-		buildArgBaseImage := fmt.Sprintf("BASE_IMAGE=%s", viper.GetString("baseImage"))
-		buildArgOcmCLIVersion := fmt.Sprintf("OCM_CLI_VERSION=%s", viper.GetString("ocmCLIVersion"))
-		buildArgBackplaneCLIVersion := fmt.Sprintf("BACKPLANE_CLI_VERSION=%s", viper.GetString("backplaneCLIVersion"))
 
-		out, err := runCommandOutput(
+		ceFactory := pkgInt.NewCeFactory(map[string]interface{}{
+			"ceName": "podman",
+		})
+
+		ce, err := ceFactory.Create()
+		if err != nil {
+			logger.Fatal("Failed to create container engine: ", err)
+		}
+
+		ce.AppendBuildArg("BASE_IMAGE", config.GetBaseImage())
+		ce.AppendBuildArg("OCM_CLI_VERSION", config.GetOcmCLIVersion())
+		ce.AppendBuildArg("BACKPLANE_CLI_VERSION", config.GetBackplaneCLIVersion())
+
+		out, err := pkgIntHelper.RunCommandOutput(
 			"git",
 			"rev-parse",
 			"HEAD",
 		)
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 		headSha := string(out)
-		buildArgBuildSha := fmt.Sprintf("BUILD_SHA=%s", headSha)
+		ce.AppendBuildArg("BUILD_SHA", headSha)
 
-		runCommandStreamOutput(
-			"podman",
-			"build",
-			"-t",
-			"ocm-workspace",
-			"--build-arg",
-			buildArgBaseImage,
-			"--build-arg",
-			buildArgOcmCLIVersion,
-			"--build-arg",
-			buildArgBackplaneCLIVersion,
-			"--build-arg",
-			buildArgBuildSha,
-			".",
-		)
+		buildArgs := ce.GetBuildArgs()
+		pkgIntHelper.RunCommandStreamOutput(ce.GetExecName(), buildArgs...)
 	},
 }
 
