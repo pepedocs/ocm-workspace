@@ -1,6 +1,8 @@
 # ocm-workspace
 A containerised workspace for running OpenShift Dedicated (OSD) cluster management tools (e.g. ocm-cli, oc, etc).
 
+> **WARNING**: The code after version `1.0.0-beta` has several breaking changes due to a major rewrites. Please only use this document for version `1.0.0-beta`.
+
 # Goal
 Provide a deployable, extensible and isolated (container-isolation only) workspace for managing OSD clusters.
 
