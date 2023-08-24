@@ -35,7 +35,8 @@ RUN pip install aiohttp \
 ARG BUILD_SHA=
 ENV BUILD_SHA=${BUILD_SHA}
 
-RUN mkdir -p /ocm-workspace/shared
+RUN mkdir -p /ocm-workspace
 WORKDIR /ocm-workspace
 ADD ./workspace .
 RUN chmod +x ./workspace && cp ./workspace /usr/bin/workspace
+

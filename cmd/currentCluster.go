@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 
+	pkgIntHelper "ocm-workspace/internal/helpers"
+
 	"github.com/spf13/cobra"
 )
 
@@ -26,12 +28,13 @@ var currentClusterCmd = &cobra.Command{
 	Use:   "currentCluster",
 	Short: "Shows the current cluster where a user is logged in.",
 	Run: func(cmd *cobra.Command, args []string) {
-		if !checkContainerCommand() {
+		if err := checkContainerCommand(); err != nil {
 			return
 		}
-		cluster, err := ocGetCurrentOcmCluster()
+
+		cluster, err := pkgIntHelper.OcGetCurrentOcmCluster()
 		if err != nil {
-			fmt.Print("unknown")
+			fmt.Print("")
 		}
 		fmt.Print(cluster)
 	},

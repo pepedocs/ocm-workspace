@@ -19,6 +19,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	pkgIntHelper "ocm-workspace/internal/helpers"
 )
 
 var (
@@ -31,12 +33,13 @@ var currentNamespaceCmd = &cobra.Command{
 	Use:   "currentNamespace",
 	Short: "Shows OpenShift's current context namespace given an OpenShift user.",
 	Run: func(cmd *cobra.Command, args []string) {
-		if !checkContainerCommand() {
+		if err := checkContainerCommand(); err != nil {
 			return
 		}
-		namespace, err := ocGetCurrentNamespace(currentNamespaceCmdArgs.ocUser)
+
+		namespace, err := pkgIntHelper.OcGetCurrentNamespace(currentNamespaceCmdArgs.ocUser)
 		if err != nil {
-			fmt.Print("na")
+			fmt.Print("")
 		}
 		fmt.Print(namespace)
 	},
