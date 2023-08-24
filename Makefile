@@ -8,7 +8,7 @@ install:
 
 .PHONY: buildImage
 buildImage:
-	echo "this config is for the build" >> ~/.ocm-workspace.yaml &&
+	$(shell echo "myVersion: user" >> ~/.ocm-workspace.yaml) \
 	./workspace build
 
 .PHONY: all
