@@ -65,10 +65,10 @@ func NewOcmWorkspaceContainer(config *pkgInt.OcmWorkspaceConfig) *ocmWorkspaceCo
 	}
 	return &ocmWorkspaceContainer{
 		HostUser:         getEnvVar("HOST_USER"),
-		UserHome:         config.GetUserHome(),
+		UserHome:         config.UserHome,
 		IsOcmLoginOnly:   getEnvVar("IS_OCM_LOGIN_ONLY"),
 		CUSTOM_PORT_MAPS: getEnvVar("CUSTOM_PORT_MAPS"),
-		UserBashrcPath:   fmt.Sprintf("%s/.bashrc", config.GetUserHome()),
+		UserBashrcPath:   fmt.Sprintf("%s/.bashrc", config.UserHome),
 		OcmCluster:       getEnvVar("OCM_CLUSTER"),
 		OcmToken:         getEnvVar("OCM_TOKEN"),
 		OcmEnvironment:   getEnvVar("OCM_ENVIRONMENT"),

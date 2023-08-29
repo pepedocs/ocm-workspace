@@ -58,7 +58,7 @@ func onClusterLogin(cmd *cobra.Command, args []string) {
 		allocatedContainerPorts = append(allocatedContainerPorts, ports[1])
 	}
 
-	plugins := config.GetPlugins()
+	plugins := config.Plugins
 	for _, plug := range plugins {
 
 		if plug.RunOn == "ocmBackplaneLoginSuccess" {
@@ -100,7 +100,7 @@ func runTerminal() {
 		}
 
 		exportStr := "\nexport PATH=$PATH"
-		for _, path := range config.GetAddToPATHEnv() {
+		for _, path := range config.AddToPATHEnv {
 			exportStr += fmt.Sprintf(":%s", path)
 		}
 		_, err = file.WriteString(exportStr)
@@ -108,7 +108,7 @@ func runTerminal() {
 			logger.Errorf("Failed to write to file %s: %s\n", ocmWorkspace.UserBashrcPath, err)
 		}
 
-		for _, path := range config.GetExportEnvVars() {
+		for _, path := range config.ExportEnvVars {
 			exportStr = fmt.Sprintf("\nexport %s", path)
 			_, err = file.WriteString(exportStr)
 			if err != nil {

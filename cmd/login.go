@@ -65,7 +65,7 @@ func onLogin(cmd *cobra.Command, args []string) {
 		logger.Fatal("Failed to create container engine: ", err)
 	}
 
-	ocmLongLivedTokenPath := config.GetOcmLongLivedTokenPath()
+	ocmLongLivedTokenPath := config.OcmLongLivedTokenPath
 	var ocmToken string
 
 	if len(ocmLongLivedTokenPath) > 0 {
@@ -94,8 +94,8 @@ func onLogin(cmd *cobra.Command, args []string) {
 	openshiftConsolePort := strconv.Itoa(ports[0])
 
 	// Gather values for the container's environment variables
-	ce.AppendEnvVar("HOST_USER", config.GetHostUser())
-	ce.AppendEnvVar("OC_USER", config.GetOcUser())
+	ce.AppendEnvVar("HOST_USER", config.HostUser)
+	ce.AppendEnvVar("OC_USER", config.OcUser)
 	ce.AppendEnvVar("OCM_CLUSTER", ocmCluster)
 	ce.AppendEnvVar("IS_OCM_LOGIN_ONLY", strconv.FormatBool(isOcmLoginOnly))
 	ce.AppendEnvVar("OCM_TOKEN", ocmToken)
@@ -108,26 +108,26 @@ func onLogin(cmd *cobra.Command, args []string) {
 	// Gather values for the container's host-mounted volumes
 	if ocmEnvironment == "production" {
 		ce.AppendVolMap(
-			fmt.Sprintf("%s/.config/backplane/%s", config.GetUserHome(), config.GetBackplaneConfigProd()),
+			fmt.Sprintf("%s/.config/backplane/%s", config.UserHome, config.BackplaneConfigProd),
 			containerBackplaneConfigPath,
 			"ro",
 		)
 	} else {
 		ce.AppendVolMap(
-			fmt.Sprintf("%s/.config/backplane/%s", config.GetUserHome(), config.GetBackplaneConfigStage()),
+			fmt.Sprintf("%s/.config/backplane/%s", config.UserHome, config.BackplaneConfigStage),
 			containerBackplaneConfigPath,
 			"ro",
 		)
 	}
 	ce.AppendVolMap("./terminal", "/terminal", "ro")
-	ce.AppendVolMap(fmt.Sprintf("%s/.ocm-workspace.yaml", config.GetUserHome()), ocmWorkspaceConfigPath, "ro")
+	ce.AppendVolMap(fmt.Sprintf("%s/.ocm-workspace.yaml", config.UserHome), ocmWorkspaceConfigPath, "ro")
 
-	for _, dirMap := range config.GetCustomDirMaps() {
+	for _, dirMap := range config.CustomDirMaps {
 		ce.AppendVolMap(dirMap.HostDir, dirMap.ContainerDir, dirMap.FileAttrs)
 	}
 
 	// Mount plugin executables
-	plugins := config.GetPlugins()
+	plugins := config.Plugins
 	for _, plug := range plugins {
 		ce.AppendVolMap(plug.ExecPath, fmt.Sprintf("/%s", plug.Name), "ro")
 	}

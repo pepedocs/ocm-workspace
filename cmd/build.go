@@ -39,9 +39,9 @@ var buildCmd = &cobra.Command{
 			logger.Fatal("Failed to create container engine: ", err)
 		}
 
-		ce.AppendBuildArg("BASE_IMAGE", config.GetBaseImage())
-		ce.AppendBuildArg("OCM_CLI_VERSION", config.GetOcmCLIVersion())
-		ce.AppendBuildArg("BACKPLANE_CLI_VERSION", config.GetBackplaneCLIVersion())
+		ce.AppendBuildArg("BASE_IMAGE", config.BaseImage)
+		ce.AppendBuildArg("OCM_CLI_VERSION", config.OCMCLIVersion)
+		ce.AppendBuildArg("BACKPLANE_CLI_VERSION", config.BackplaneCLIVersion)
 
 		out, err := pkgIntHelper.RunCommandOutput(
 			"git",
