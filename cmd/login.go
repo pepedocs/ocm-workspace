@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
@@ -167,17 +166,13 @@ func onLogin(cmd *cobra.Command, args []string) {
 
 	logger.Debugf("Container run command: %v", runCmd)
 
-	err = pkgIntHelper.RunCommandWithOsFiles(
+	pkgIntHelper.RunCommandWithOsFiles(
 		ce.GetExecName(),
 		os.Stdout,
 		os.Stderr,
 		os.Stdin,
 		runCmd...,
 	)
-
-	if err != nil {
-		log.Fatal("Failed to run command: ", err)
-	}
 }
 
 func init() {
