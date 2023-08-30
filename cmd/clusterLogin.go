@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -123,13 +124,18 @@ func runTerminal() {
 }
 
 func runPlugin(plug pkgInt.Plugin, configPath string, envVars [][]string) error {
+	executable := filepath.Base(plug.ExecPath)
 	cmdArgs := []string{
 		"-Eu",
 		getEnvVar("HOST_USER"),
-		fmt.Sprintf("/%s", plug.Name), plug.ExecCommand, "--config", configPath}
+		fmt.Sprintf("/usr/bin/%s", executable),
+		plug.ExecCommand,
+		"--config", configPath}
 	if debug {
 		cmdArgs = append(cmdArgs, "-d")
 	}
+	logger.Debugf("Running plugin with args: %v %v", cmdArgs, envVars)
+
 	err := pkgIntHelper.RunCommandBackground("sudo", cmdArgs, envVars)
 	return err
 }

@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -128,7 +129,8 @@ func onLogin(cmd *cobra.Command, args []string) {
 	// Mount plugin executables
 	plugins := config.Plugins
 	for _, plug := range plugins {
-		ce.AppendVolMap(plug.ExecPath, fmt.Sprintf("/%s", plug.Name), "ro")
+		executable := filepath.Base(plug.ExecPath)
+		ce.AppendVolMap(plug.ExecPath, fmt.Sprintf("/usr/bin/%s", executable), "ro")
 	}
 
 	// Gather values for the containers host-mapped TCP ports

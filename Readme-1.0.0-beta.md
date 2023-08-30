@@ -1,13 +1,15 @@
 # ocm-workspace
 A containerised workspace for running OpenShift Dedicated (OSD) cluster management tools (e.g. ocm-cli, oc, etc).
 
+> **WARNING**: The code after version `1.0.0-beta` has several breaking changes due to a major rewrites. Please only use this document for version `1.0.0-beta`.
+
 # Goal
 Provide a deployable, extensible and isolated (container-isolation only) workspace for managing OSD clusters.
 
 > **Important:** ocm-workspace is a user container workspace which is intended to be customized by the user only and not a means to control "how to do" things.
 
 # Prerequisites
-1. Clone this repository where the branch must be newer than the tag `1.0.0-beta`.
+1. Clone this repository.
 2. Installed podman, golang and make binaries.
 3. A configuration file located in `/home/<user>/.ocm-workspace.yaml`. See [configuration](#configuration)
 
@@ -87,52 +89,26 @@ rhocCLIVersion: "0.0.37"
 backplaneCLIVersion: "0.1.2"
 ```
 
-# Plugins
-The workspace supports running of plugins at certain points in its execution. Plugins are executables that run inside the ocm-workspace container but reside in a different repository including their binaries that need to be built by a user before it can be used by ocm-workspace. A plugin's executable is mounted at container run as a volume.
+# Service Reference Configuration
+A service reference can be added in the configuration file to enable tool features relevant to a certain service. This feature is useful for accessing a service (e.g. web console) from the ocm-workspace's host. Note that from the host's side, its port is only accessible through the loopback interface.
 
-### portForward Plugin
-An example of a working plugin called `portForward` that automatically forwards ports of a kubernetes service, to a container port and finally to a host port so that a user can access the k8s service from the host. For example, this plugin can be used to access some web console (e.g. prometheus console) from the host.
-
-A user must configure their plugins and ensure they can be located by ocm-workspace.
-```
-plugins:
-  - name: portForward
-    execPath: /home/jcueto/workspace/repos/ocm-workspace-plugins/portForward/portForward
-    runOn: ocmBackplaneLoginSuccess
-    allocatePorts: 2
-    execCommand: portForward
-    config: |
-      services:
-        - name: rhoam
-          ports:
-            - name: prometheus-console
-              namespace: redhat-rhoam-operator-observability
-              source:
-                kind: pod
-                name: prometheus-rhoam-0
-              svcPort: 9090
-            - name: alertmanager-console
-              namespace: redhat-rhoam-operator-observability
-              source:
-                kind: pod
-                name: alertmanager-rhoam-0
-              svcPort: 9093
+For example the following will automatically forward the specified ports of service `nginx` to an ocm-workspace port that is also mapped to a host port.
 
 ```
-
-**Breakdown of Configuration**
-
-`plugins` -  A list of plugin configurations.
-
-`plugins.name` - The name of the plugin.
-
-`plugins.execPath` - The path to the plugin's executable.
-
-`plugins.runOn` - The workspace's execution point where a plugin must be started.
-
-`plugins.allocatePorts`: This tells the workspace to allocate the number of ports that are mapped from the host to the container (e.g. hostport:containerport)
-
-`execCommand` - This is the plugin's executable CLI command. Therefore a plugin is required to at least have one CLI command.
-
-`plugins.config` - This is the plugin's config file that must be a YAML file. The workspace does not use this config, however it makes it available to the plugin inside the container.
-
+# forward to host mapped ports
+services:
+  - name: nginx
+    forwardPorts:
+      - name: prometheus-console
+        namespace: nginx
+        source:
+          kind: pod
+          name: nginx-prometheus
+        port: 9090
+      - name: alertmanager-console
+        namespace: nginx
+        source:
+          kind: pod
+          name: nginx-alertmanager
+        port: 9093
+```
