@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/go-cmd/cmd v1.4.1
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/golang/glog v1.2.4
 	github.com/google/uuid v1.1.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.7.0
